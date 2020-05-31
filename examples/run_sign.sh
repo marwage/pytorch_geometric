@@ -1,5 +1,7 @@
 #!/bin/bash
 
-nvidia-smi dmon -s umt -o T -f sign_reddit.txt &
+trap "kill %1" SIGINT
+
+nvidia-smi dmon -s umt -o T -f sign_reddit.smi &
 
 python3 sign_reddit.py
