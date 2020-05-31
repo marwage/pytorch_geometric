@@ -1,25 +1,25 @@
 import os.path as osp
-import time
-import logging
 
 import torch
 import torch.nn.functional as F
-from torch_geometric.datasets import Reddit
+from torch_geometric.datasets import Flickr
 from torch_geometric.data import GraphSAINTRandomWalkSampler
 from torch_geometric.nn import SAGEConv
 from torch_geometric.utils import degree
 
-logging.basicConfig(filename='graph_saint_reddit.log',level=logging.DEBUG)
+import time
+import logging
+logging.basicConfig(filename='graph_saint_flickr.log',level=logging.DEBUG)
 start = time.time()
 
 
-path = osp.join(osp.dirname(osp.realpath(__file__)), '..', 'data', 'Reddit')
-dataset = Reddit(path)
+path = osp.join(osp.dirname(osp.realpath(__file__)), '..', 'data', 'Flickr')
+dataset = Flickr(path)
 data = dataset[0]
 row, col = data.edge_index
 data.edge_attr = 1. / degree(col, data.num_nodes)[col]  # Norm by in-degree.
 
-loader = GraphSAINTRandomWalkSampler(data, batch_size=6000, walk_length=2,
+loader = GraphSAINTRandomWalkSampler(data, batch_size=6000, walk_length=10,
                                      num_steps=5, sample_coverage=1000,
                                      save_dir=dataset.processed_dir,
                                      num_workers=0)
@@ -32,15 +32,29 @@ class Net(torch.nn.Module):
         super(Net, self).__init__()
         in_channels = dataset.num_node_features
         out_channels = dataset.num_classes
-        self.conv1 = SAGEConv(in_channels, hidden_channels)
-        self.conv2 = SAGEConv(hidden_channels, hidden_channels)
-        self.conv3 = SAGEConv(hidden_channels, hidden_channels)
-        self.lin = torch.nn.Linear(3 * hidden_channels, out_channels)
+        self.conv1 = SAGEConv(in_channels, hidden_channels, concat=True)
+        self.conv2 = SAGEConv(hidden_channels, hidden_channels, concat=True)
+        self.conv3 = SAGEConv(hidden_channels, hidden_channels, concat=True)
+        self.conv4 = SAGEConv(hidden_channels, hidden_channels, concat=True)
+        self.conv5 = SAGEConv(hidden_channels, hidden_channels, concat=True)
+        self.conv6 = SAGEConv(hidden_channels, hidden_channels, concat=True)
+        self.conv7 = SAGEConv(hidden_channels, hidden_channels, concat=True)
+        self.conv8 = SAGEConv(hidden_channels, hidden_channels, concat=True)
+        self.conv9 = SAGEConv(hidden_channels, hidden_channels, concat=True)
+        self.conv10 = SAGEConv(hidden_channels, hidden_channels, concat=True)
+        self.lin = torch.nn.Linear(10 * hidden_channels, out_channels)
 
     def set_aggr(self, aggr):
         self.conv1.aggr = aggr
         self.conv2.aggr = aggr
         self.conv3.aggr = aggr
+        self.conv4.aggr = aggr
+        self.conv5.aggr = aggr
+        self.conv6.aggr = aggr
+        self.conv7.aggr = aggr
+        self.conv8.aggr = aggr
+        self.conv9.aggr = aggr
+        self.conv10.aggr = aggr
 
     def forward(self, x0, edge_index, edge_weight=None):
         x1 = F.relu(self.conv1(x0, edge_index, edge_weight))
@@ -49,7 +63,21 @@ class Net(torch.nn.Module):
         x2 = F.dropout(x2, p=0.2, training=self.training)
         x3 = F.relu(self.conv3(x2, edge_index, edge_weight))
         x3 = F.dropout(x3, p=0.2, training=self.training)
-        x = torch.cat([x1, x2, x3], dim=-1)
+        x4 = F.relu(self.conv4(x3, edge_index, edge_weight))
+        x4 = F.dropout(x4, p=0.2, training=self.training)
+        x5 = F.relu(self.conv5(x4, edge_index, edge_weight))
+        x5 = F.dropout(x5, p=0.2, training=self.training)
+        x6 = F.relu(self.conv6(x5, edge_index, edge_weight))
+        x6 = F.dropout(x6, p=0.2, training=self.training)
+        x7 = F.relu(self.conv3(x6, edge_index, edge_weight))
+        x7 = F.dropout(x7, p=0.2, training=self.training)
+        x8 = F.relu(self.conv4(x7, edge_index, edge_weight))
+        x8 = F.dropout(x8, p=0.2, training=self.training)
+        x9 = F.relu(self.conv5(x8, edge_index, edge_weight))
+        x9 = F.dropout(x9, p=0.2, training=self.training)
+        x10 = F.relu(self.conv6(x9, edge_index, edge_weight))
+        x10 = F.dropout(x10, p=0.2, training=self.training)
+        x = torch.cat([x1, x2, x3, x4, x5, x6, x7, x8, x9, x10], dim=-1)
         x = self.lin(x)
         return x.log_softmax(dim=-1)
 
@@ -111,5 +139,5 @@ for epoch in range(1, 51):
           f'Val: {accs[1]:.4f}, Test: {accs[2]:.4f}')
 
 end = time.time()
-whole_training_time = end - start
-logging.info("whole training took " + str(whole_training_time))
+whole_training = end - start
+logging.info("whole training took " + str(whole_training))
