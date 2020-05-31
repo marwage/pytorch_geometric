@@ -111,5 +111,5 @@ for epoch in range(1, 51):
           f'Val: {accs[1]:.4f}, Test: {accs[2]:.4f}')
 
 end = time.time()
-whole_training_time = end - start
-logging.info("whole training took " + str(whole_training_time))
+time_whole_training = end - start
+logging.info("whole training took " + str(time_whole_training))

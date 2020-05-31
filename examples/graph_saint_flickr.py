@@ -1,4 +1,6 @@
 import os.path as osp
+import time
+import logging
 
 import torch
 import torch.nn.functional as F
@@ -7,8 +9,6 @@ from torch_geometric.data import GraphSAINTRandomWalkSampler
 from torch_geometric.nn import SAGEConv
 from torch_geometric.utils import degree
 
-import time
-import logging
 logging.basicConfig(filename='graph_saint_flickr.log',level=logging.DEBUG)
 start = time.time()
 

@@ -5,17 +5,17 @@ import logging
 import torch
 import torch.nn.functional as F
 from torch.nn import Linear
-from torch_geometric.datasets import Reddit
+from torch_geometric.datasets import Flickr
 import torch_geometric.transforms as T
 
-logging.basicConfig(filename='sign_reddit.log',level=logging.DEBUG)
+logging.basicConfig(filename='sign_flickr.log',level=logging.DEBUG)
 start = time.time()
 
 
 K = 2
-path = osp.join(osp.dirname(osp.realpath(__file__)), '..', 'data', 'Reddit')
+path = osp.join(osp.dirname(osp.realpath(__file__)), '..', 'data', 'Flickr')
 transform = T.Compose([T.NormalizeFeatures(), T.SIGN(K)])
-dataset = Reddit(path, transform=transform)
+dataset = Flickr(path, transform=transform)
 data = dataset[0]
 
 time_preprocessing_data = time.time() - start
@@ -26,10 +26,9 @@ class Net(torch.nn.Module):
         super(Net, self).__init__()
 
         self.lins = torch.nn.ModuleList()
-        num_hidden_channels = 256
         for _ in range(K + 1):
-            self.lins.append(Linear(dataset.num_node_features, num_hidden_channels))
-        self.lin = Linear((K + 1) * num_hidden_channels, dataset.num_classes)
+            self.lins.append(Linear(dataset.num_node_features, 1024))
+        self.lin = Linear((K + 1) * 1024, dataset.num_classes)
 
     def forward(self):
         xs = [data.x] + [data[f'x{i}'] for i in range(1, K + 1)]
