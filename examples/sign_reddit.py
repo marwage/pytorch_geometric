@@ -12,7 +12,7 @@ logging.basicConfig(filename='sign_reddit.log',level=logging.DEBUG)
 start = time.time()
 
 
-K = 2
+K = 4
 path = osp.join(osp.dirname(osp.realpath(__file__)), '..', 'data', 'Reddit')
 transform = T.Compose([T.NormalizeFeatures(), T.SIGN(K)])
 dataset = Reddit(path, transform=transform)
