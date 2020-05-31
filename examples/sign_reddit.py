@@ -26,7 +26,7 @@ class Net(torch.nn.Module):
         super(Net, self).__init__()
 
         self.lins = torch.nn.ModuleList()
-        num_hidden_channels = 256
+        num_hidden_channels = 512
         for _ in range(K + 1):
             self.lins.append(Linear(dataset.num_node_features, num_hidden_channels))
         self.lin = Linear((K + 1) * num_hidden_channels, dataset.num_classes)
@@ -42,7 +42,12 @@ class Net(torch.nn.Module):
 
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+start_copying = time.time()
 model, data = Net().to(device), data.to(device)
+time_copying = time.time() - start_copying
+logging.info("copying took " + str(time_copying))
+
 optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
 
 
