@@ -48,13 +48,15 @@ model, data = Net().to(device), data.to(device)
 time_copying = time.time() - start_copying
 logging.info("copying took " + str(time_copying))
 
+loss_op = torch.nn.BCEWithLogitsLoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
 
 
 def train():
     model.train()
     optimizer.zero_grad()
-    F.nll_loss(model(), data.y).backward()
+    loss = loss_op(model(), data.y)
+    loss.backward()
     optimizer.step()
 
 
