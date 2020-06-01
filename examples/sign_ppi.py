@@ -57,9 +57,11 @@ def train():
     model.train()
     total_loss = 0
     for data in loader:
+        num_graphs = data.num_graphs
         data = data.to(device)
         optimizer.zero_grad()
         loss = loss_op(model(data), data.y)
+        total_loss += loss.item() * num_graphs
         loss.backward()
         optimizer.step()
     return total_loss / len(loader.dataset)
