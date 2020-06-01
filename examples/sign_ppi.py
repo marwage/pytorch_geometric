@@ -54,7 +54,7 @@ optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
 def train():
     model.train()
     optimizer.zero_grad()
-    F.nll_loss(model()[data.train_mask], data.y[data.train_mask]).backward()
+    F.nll_loss(model(), data.y).backward()
     optimizer.step()
 
 
@@ -72,12 +72,12 @@ def test():
 best_val_acc = test_acc = 0
 for epoch in range(1, 201):
     train()
-    train_acc, val_acc, tmp_test_acc = test()
-    if val_acc > best_val_acc:
-        best_val_acc = val_acc
-        test_acc = tmp_test_acc
-    log = 'Epoch: {:03d}, Train: {:.4f}, Val: {:.4f}, Test: {:.4f}'
-    logging.info(log.format(epoch, train_acc, best_val_acc, test_acc))
+    # train_acc, val_acc, tmp_test_acc = test()
+    # if val_acc > best_val_acc:
+    #     best_val_acc = val_acc
+    #     test_acc = tmp_test_acc
+    # log = 'Epoch: {:03d}, Train: {:.4f}, Val: {:.4f}, Test: {:.4f}'
+    # logging.info(log.format(epoch, train_acc, best_val_acc, test_acc))
 
 end = time.time()
 time_whole_training = end - start
