@@ -4,15 +4,15 @@ import logging
 
 import torch
 import torch.nn.functional as F
-from torch_geometric.datasets import Reddit
+from torch_geometric.datasets import PPI
 from torch_geometric.data import ClusterData, ClusterLoader
 from torch_geometric.nn import SAGEConv
 
-logging.basicConfig(filename='cluster_gcn_reddit.log',level=logging.DEBUG)
+logging.basicConfig(filename='cluster_gcn_ppi.log',level=logging.DEBUG)
 start = time.time()
 
-path = osp.join(osp.dirname(osp.realpath(__file__)), '..', 'data', 'Reddit')
-dataset = Reddit(path)
+path = osp.join(osp.dirname(osp.realpath(__file__)), '..', 'data', 'PPI')
+dataset = PPI(path)
 data = dataset[0]
 
 print('Partioning the graph... (this may take a while)')
