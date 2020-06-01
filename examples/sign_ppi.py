@@ -5,7 +5,7 @@ import logging
 import torch
 import torch.nn.functional as F
 from torch.nn import Linear
-from torch_geometric.datasets import Reddit
+from torch_geometric.datasets import PPI
 import torch_geometric.transforms as T
 
 logging.basicConfig(filename='sign_reddit.log',level=logging.DEBUG)
@@ -13,9 +13,8 @@ start = time.time()
 
 
 K = 3
-path = osp.join(osp.dirname(osp.realpath(__file__)), '..', 'data', 'Reddit')
+path = osp.join(osp.dirname(osp.realpath(__file__)), '..', 'data', 'PPI')
 transform = T.Compose([T.NormalizeFeatures(), T.SIGN(K)])
-dataset = Reddit(path, transform=transform)
 train_dataset = PPI(path, transform=transform, split='train')
 val_dataset = PPI(path, transform=transform, split='val')
 test_dataset = PPI(path, transform=transform, split='test')
@@ -33,8 +32,8 @@ class Net(torch.nn.Module):
         self.lins = torch.nn.ModuleList()
         num_hidden_channels = 512
         for _ in range(K + 1):
-            self.lins.append(Linear(dataset.num_node_features, num_hidden_channels))
-        self.lin = Linear((K + 1) * num_hidden_channels, dataset.num_classes)
+            self.lins.append(Linear(train_dataset.num_node_features, num_hidden_channels))
+        self.lin = Linear((K + 1) * num_hidden_channels, train_dataset.num_classes)
 
     def forward(self):
         xs = [data.x] + [data[f'x{i}'] for i in range(1, K + 1)]
