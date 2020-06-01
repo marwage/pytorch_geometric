@@ -12,13 +12,24 @@ logging.basicConfig(filename='cluster_gcn_ppi.log',level=logging.DEBUG)
 start = time.time()
 
 path = osp.join(osp.dirname(osp.realpath(__file__)), '..', 'data', 'PPI')
-dataset = PPI(path)
-data = dataset[0]
+train_dataset = PPI(path, split='train')
+val_dataset = PPI(path, split='val')
+test_dataset = PPI(path, split='test')
 
 print('Partioning the graph... (this may take a while)')
-cluster_data = ClusterData(data, num_parts=1500, recursive=False,
-                           save_dir=dataset.processed_dir)
-loader = ClusterLoader(cluster_data, batch_size=20, shuffle=True,
+num_parts = 1500
+batch_size = 20
+train_cluster_data = ClusterData(train_dataset, num_parts=num_parts, recursive=False,
+                           save_dir=train_dataset.processed_dir)
+train_loader = ClusterLoader(train_cluster_data, batch_size=batch_size, shuffle=True,
+                       num_workers=0)
+val_cluster_data = ClusterData(val_dataset, num_parts=num_parts, recursive=False,
+                           save_dir=val_dataset.processed_dir)
+val_loader = ClusterLoader(val_cluster_data, batch_size=batch_size, shuffle=True,
+                       num_workers=0)
+test_cluster_data = ClusterData(test_dataset, num_parts=num_parts, recursive=False,
+                           save_dir=test_dataset.processed_dir)
+test_loader = ClusterLoader(test_cluster_data, batch_size=batch_size, shuffle=True,
                        num_workers=0)
 
 time_partioning_graph = time.time() - start
@@ -40,22 +51,22 @@ class Net(torch.nn.Module):
 
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-model = Net(dataset.num_features, dataset.num_classes).to(device)
+model = Net(train_dataset.num_features, train_dataset.num_classes).to(device)
 optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
 
 
 def train():
     model.train()
     total_loss = total_nodes = 0
-    for data in loader:
+    for data in train_loader:
         data = data.to(device)
         optimizer.zero_grad()
         logits = model(data.x, data.edge_index)
-        loss = F.nll_loss(logits[data.train_mask], data.y[data.train_mask])
+        loss = F.nll_loss(logits, data.y)
         loss.backward()
         optimizer.step()
 
-        nodes = data.train_mask.sum().item()
+        nodes = data.sum().item()
         total_loss += loss.item() * nodes
         total_nodes += nodes
 
@@ -65,16 +76,15 @@ def train():
 @torch.no_grad()
 def test():
     model.eval()
-    total_correct, total_nodes = [0, 0, 0], [0, 0, 0]
-    for data in loader:
+    total_correct, total_nodes = 0, 0
+    for data in test_loader:
         data = data.to(device)
         logits = model(data.x, data.edge_index)
         pred = logits.argmax(dim=1)
 
-        masks = [data.train_mask, data.val_mask, data.test_mask]
-        for i, mask in enumerate(masks):
-            total_correct[i] += (pred[mask] == data.y[mask]).sum().item()
-            total_nodes[i] += mask.sum().item()
+        total_correct += (pred == data.y).sum().item()
+        # total_nodes += data.x.sum().item()
+        total_nodes += len(data)
 
     return (torch.Tensor(total_correct) / torch.Tensor(total_nodes)).tolist()
 
