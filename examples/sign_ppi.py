@@ -77,10 +77,9 @@ def test():
     for loader in [train_loader, val_loader, test_loader]:
         ys, preds = [], []
         for data in loader:
-            data = data.to(device)
             ys.append(data.y)
             with torch.no_grad():
-                out = model(data)
+                out = model(data.to(device))
             preds.append((out > 0).float().cpu())
 
         y, pred = torch.cat(ys, dim=0).numpy(), torch.cat(preds, dim=0).numpy()
