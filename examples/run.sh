@@ -1,6 +1,6 @@
 #!/bin/bash
 
-NAME="cluster_gcn_ppi"
+NAME="sign_ppi"
 
 nvidia-smi dmon -s umt -o T -f ${NAME}.smi &
 
