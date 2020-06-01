@@ -36,7 +36,7 @@ class Net(torch.nn.Module):
         self.lin = Linear((K + 1) * num_hidden_channels, train_dataset.num_classes)
 
     def forward(self):
-        xs = [data.x] + [data[f'x{i}'] for i in range(1, K + 1)]
+        xs = [train_data.x] + [train_data[f'x{i}'] for i in range(1, K + 1)]
         for i, lin in enumerate(self.lins):
             out = F.dropout(F.relu(lin(xs[i])), p=0.5, training=self.training)
             xs[i] = out
@@ -48,7 +48,10 @@ class Net(torch.nn.Module):
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 start_copying = time.time()
-model, data = Net().to(device), data.to(device)
+model = Net().to(device)
+train_data = train_data.to(device)
+val_data = val_data.to(device)
+test_data = test_data.to(device)
 time_copying = time.time() - start_copying
 logging.info("copying took " + str(time_copying))
 
