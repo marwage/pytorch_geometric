@@ -77,6 +77,7 @@ def test():
     for loader in [train_loader, val_loader, test_loader]:
         ys, preds = [], []
         for data in loader:
+            data = data.to(device)
             ys.append(data.y)
             with torch.no_grad():
                 out = model(data)
@@ -91,8 +92,6 @@ def test():
 best_val_acc = test_acc = 0
 for epoch in range(1, 201):
     loss = train()
-    log = 'Epoch: {:03d}, Train: {:.4f}'
-    logging.info(log.format(epoch, loss))
     train_acc, val_acc, tmp_test_acc = test()
     if val_acc > best_val_acc:
         best_val_acc = val_acc
