@@ -76,12 +76,13 @@ def test():
             preds.append((pred[mask] > 0).float().cpu())
             ys.append(data.y[mask])
     
-    f1_scores = []
+    scores = []
     for y, pred in zip(ys, preds):
-        f1 = f1_score(y.numpy(), pred.numpy(), average='micro') if pred.sum() > 0 else 0
-        f1_scores.append(f1)
+        y, pred = torch.cat(ys, dim=0).numpy(), torch.cat(preds, dim=0).numpy()
+        score = f1_score(y, pred, average='micro') if pred.sum() > 0 else 0
+        scores.append(score)
 
-    return f1_scores
+    return scores
 
 for epoch in range(1, 31):
     loss = train()
