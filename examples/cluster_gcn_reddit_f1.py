@@ -82,7 +82,7 @@ def test():
         print("type of y", type(y))
         print("len of y[0]", len(y[0]))
         print("type of y[0]", type(y[0]))
-        y, pred = torch.cat(ys, dim=0).numpy(), torch.cat(preds, dim=0).numpy()
+        y, pred = torch.cat(y, dim=0).numpy(), torch.cat(pred, dim=0).numpy()
         score = f1_score(y, pred, average='micro') if pred.sum() > 0 else 0
         scores.append(score)
 
