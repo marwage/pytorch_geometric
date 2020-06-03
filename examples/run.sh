@@ -1,6 +1,6 @@
 #!/bin/bash
 
-NAME="sign_ppi"
+NAME="graph_saint_reddit"
 
 nvidia-smi dmon -s umt -o T -f ${NAME}.smi &
 
