@@ -72,9 +72,9 @@ def test():
         logits = model(data.x.to(device), data.edge_index.to(device))
         pred = logits.argmax(dim=1)
         masks = [data.train_mask, data.val_mask, data.test_mask]
-        for _, mask in enumerate(masks):
-            preds.append((pred[mask] > 0).float().cpu())
-            ys.append(data.y[mask])
+        for i, mask in enumerate(masks):
+            preds[i].append((pred[mask] > 0).float().cpu())
+            ys[i].append(data.y[mask])
     
     scores = []
     for y, pred in zip(ys, preds):
