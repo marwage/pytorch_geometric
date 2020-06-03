@@ -1,6 +1,8 @@
 # Reaches around 0.7870 ± 0.0036 test accuracy.
 
 import os.path as osp
+import time
+import logging
 
 import torch
 import torch.nn.functional as F
@@ -8,6 +10,10 @@ from tqdm import tqdm
 from ogb.nodeproppred import PygNodePropPredDataset, Evaluator
 from torch_geometric.data import NeighborSampler
 from torch_geometric.nn import SAGEConv
+
+logging.basicConfig(filename='sign_reddit.log',level=logging.DEBUG)
+start = time.time()
+
 
 root = osp.join(osp.dirname(osp.realpath(__file__)), '..', 'data', 'products')
 dataset = PygNodePropPredDataset('ogbn-products', root)
@@ -23,6 +29,8 @@ subgraph_loader = NeighborSampler(data.edge_index, node_idx=None, sizes=[-1],
                                   batch_size=4096, shuffle=False,
                                   num_workers=12)
 
+time_preprocessing_data = time.time() - start
+logging.info("preprocessing data took " + str(time_preprocessing_data))
 
 class SAGE(torch.nn.Module):
     def __init__(self, in_channels, hidden_channels, out_channels, num_layers):
@@ -148,9 +156,7 @@ def test():
 
 test_accs = []
 for run in range(1, 11):
-    print('')
-    print(f'Run {run:02d}:')
-    print('')
+    logging.info(f'Run {run:02d}:')
 
     model.reset_parameters()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.003)
@@ -158,11 +164,11 @@ for run in range(1, 11):
     best_val_acc = final_test_acc = 0
     for epoch in range(1, 21):
         loss, acc = train(epoch)
-        print(f'Epoch {epoch:02d}, Loss: {loss:.4f}, Approx. Train: {acc:.4f}')
+        logging.info(f'Epoch {epoch:02d}, Loss: {loss:.4f}, Approx. Train: {acc:.4f}')
 
         if epoch > 5:
             train_acc, val_acc, test_acc = test()
-            print(f'Train: {train_acc:.4f}, Val: {val_acc:.4f}, '
+            logging.info(f'Train: {train_acc:.4f}, Val: {val_acc:.4f}, '
                   f'Test: {test_acc:.4f}')
 
             if val_acc > best_val_acc:
@@ -171,5 +177,9 @@ for run in range(1, 11):
     test_accs.append(final_test_acc)
 
 test_acc = torch.tensor(test_accs)
-print('============================')
-print(f'Final Test: {test_acc.mean():.4f} ± {test_acc.std():.4f}')
+logging.info('============================')
+logging.info(f'Final Test: {test_acc.mean():.4f} ± {test_acc.std():.4f}')
+
+end = time.time()
+time_whole_training = end - start
+logging.info("whole training took " + str(time_whole_training))
