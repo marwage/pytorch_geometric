@@ -1,6 +1,6 @@
 #!/bin/bash
 
-NAME="cluster_gcn_reddit_f1"
+NAME="ogbn_products_sage"
 
 git rev-parse HEAD > ${NAME}.out
 

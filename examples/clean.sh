@@ -9,4 +9,3 @@ if [ $1 ]; then
         rm -r ../data/*/processed
     fi
 fi
-
