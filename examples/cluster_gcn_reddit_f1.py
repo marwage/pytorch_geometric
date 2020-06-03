@@ -78,8 +78,7 @@ def test():
     
     f1_scores = []
     for y, pred in zip(ys, preds):
-        y, pred = torch.cat(y, dim=0).numpy(), torch.cat(pred, dim=0).numpy()
-        f1 = f1_score(y, pred, average='micro') if pred.sum() > 0 else 0
+        f1 = f1_score(y.numpy(), pred.numpy(), average='micro') if pred.sum() > 0 else 0
         f1_scores.append(f1)
 
     return f1_scores
