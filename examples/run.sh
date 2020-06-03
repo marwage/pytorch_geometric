@@ -1,6 +1,6 @@
 #!/bin/bash
 
-NAME="graph_saint_reddit"
+NAME="ogbn_products_sage"
 
 git rev-parse HEAD > ${NAME}.out
 

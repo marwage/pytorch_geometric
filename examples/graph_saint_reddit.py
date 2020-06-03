@@ -19,7 +19,7 @@ data = dataset[0]
 row, col = data.edge_index
 data.edge_attr = 1. / degree(col, data.num_nodes)[col]  # Norm by in-degree.
 
-loader = GraphSAINTRandomWalkSampler(data, batch_size=1024, walk_length=2,
+loader = GraphSAINTRandomWalkSampler(data, batch_size=128, walk_length=2,
                                      num_steps=5, sample_coverage=1000,
                                      save_dir=dataset.processed_dir,
                                      num_workers=0)
@@ -55,7 +55,7 @@ class Net(torch.nn.Module):
 
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-model = Net(hidden_channels=256).to(device)
+model = Net(hidden_channels=128).to(device)
 optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
 
