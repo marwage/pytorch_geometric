@@ -3,4 +3,8 @@
 rm *.log
 rm *.smi
 rm *.out
-rm -r ../data/*/processed
+
+if [ $1 == "all"]
+then
+    rm -r ../data/*/processed
+fi
