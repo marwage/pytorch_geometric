@@ -7,7 +7,7 @@ import torch.nn.functional as F
 from torch_geometric.datasets import Reddit
 from torch_geometric.data import ClusterData, ClusterLoader
 from torch_geometric.nn import SAGEConv
-import torch.utils.checkpoint as checkpoint
+from torch.utils.checkpoint import checkpoint
 
 logging.basicConfig(filename='cluster_gcn_reddit_checkpoint.log',level=logging.DEBUG)
 start = time.time()
@@ -37,7 +37,7 @@ class Net(torch.nn.Module):
         x = F.dropout(x, p=dropout_probability, training=self.training)
         x = self.conv1(x, edge_index)
         # x = F.relu(x)
-        x = checkpoint.checkpoint(F.relu, x)
+        x = checkpoint(F.relu, x)
         x = F.dropout(x, p=dropout_probability, training=self.training)
         x = self.conv2(x, edge_index)
         return F.log_softmax(x, dim=1)
