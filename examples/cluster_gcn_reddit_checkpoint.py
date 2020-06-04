@@ -32,17 +32,13 @@ class Net(torch.nn.Module):
         self.conv1 = SAGEConv(in_channels, hidden_channels, normalize=False)
         self.conv2 = SAGEConv(hidden_channels, out_channels, normalize=False)
 
-    def checkpointable_fn(self, x, edge_index):
+    def forward(self, x, edge_index):
         dropout_probability = 0.2
         x = F.dropout(x, p=dropout_probability, training=self.training)
-        x = self.conv1(x, edge_index)
-        x = F.relu(x)
+        # x = F.relu(self.conv1(, edge_index))
+        x = checkpoint(lambda x,ei: F.relu(self.conv1(x, ei)) , x, edge_index)
         x = F.dropout(x, p=dropout_probability, training=self.training)
         x = self.conv2(x, edge_index)
-        return x
-
-    def forward(self, x, edge_index):
-        x = checkpoint(self.checkpointable_fn, x, edge_index)
         return F.log_softmax(x, dim=1)
 
 
