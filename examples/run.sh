@@ -1,6 +1,6 @@
 #!/bin/bash
 
-NAME="cluster_gcn_reddit_checkpoint"
+NAME="sign_reddit_checkpoint"
 
 git rev-parse HEAD > ${NAME}.out
 
