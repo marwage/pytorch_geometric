@@ -36,7 +36,7 @@ class Net(torch.nn.Module):
         dropout_probability = 0.2
         x = F.dropout(x, p=dropout_probability, training=self.training)
         # x = F.relu(self.conv1(, edge_index))
-        x = checkpoint(lambda x,ei: F.relu(self.conv1(x, ei)) , x, edge_index)
+        x = checkpoint(F.relu, self.conv1(, edge_index))
         x = F.dropout(x, p=dropout_probability, training=self.training)
         x = self.conv2(x, edge_index)
         return F.log_softmax(x, dim=1)
