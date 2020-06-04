@@ -11,7 +11,7 @@ from ogb.nodeproppred import PygNodePropPredDataset, Evaluator
 from torch_geometric.data import NeighborSampler
 from torch_geometric.nn import SAGEConv
 
-logging.basicConfig(filename='sign_reddit.log',level=logging.DEBUG)
+logging.basicConfig(filename='ogbn_products_sage_one_run.log',level=logging.DEBUG)
 start = time.time()
 
 
