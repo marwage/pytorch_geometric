@@ -30,7 +30,7 @@ class Net(torch.nn.Module):
         super(Net, self).__init__()
         hidden_channels = 1024
         self.conv1 = SAGEConv(in_channels, hidden_channels, normalize=False)
-        self.conv2 = SAGEConv(hidden_channels, out_channels, normalize=False)
+        self.conv2 = SAGEConv(hidden_channels, hidden_channels, normalize=False)
         self.conv3 = SAGEConv(hidden_channels, out_channels, normalize=False)
 
     def forward(self, x, edge_index):
