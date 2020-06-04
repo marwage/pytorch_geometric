@@ -42,7 +42,7 @@ class Net(torch.nn.Module):
         return x
 
     def forward(self, x, edge_index):
-        x = checkpoint(self.checkpointable_fn, (x, edge_index))
+        x = checkpoint(self.checkpointable_fn, x, edge_index)
         return F.log_softmax(x, dim=1)
 
 
