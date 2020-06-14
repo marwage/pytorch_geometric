@@ -2,35 +2,39 @@ import os.path as osp
 import time
 import logging
 import subprocess
+import pdb
 import torch
 import torch.nn.functional as F
 from torch_geometric.datasets import Flickr
 from torch_geometric.nn import SAGEConv
 
 
+def log(start, when):
+        mib = pow(2, 20)
+        logging.debug("{:.1f}s:{}:active {:.2f}MiB, allocated {:.2f}MiB, reserved {:.2f}MiB".format(time.time() - start, when, torch.cuda.memory_stats()["active_bytes.all.allocated"] / mib, torch.cuda.memory_allocated() / mib, torch.cuda.memory_reserved() / mib))
+
+
 class SAGE(torch.nn.Module):
-    def __init__(self, num_layers, in_channels, out_channels, hidden_channels):
+    def __init__(self, num_hidden_layers, in_channels, out_channels, hidden_channels):
         super(SAGE, self).__init__()
-        self.num_layers = num_layers
+        self.num_layers = num_hidden_layers + 1
         self.conv = torch.nn.ModuleList()
-        if num_layers < 1:
-            raise Exception("You must have a least one layer")
-        elif num_layers == 1:
-            self.conv.append(SAGEConv(in_channels, out_channels, normalize=False))
-        elif num_layers == 2:
+        if num_hidden_layers < 1:
+            raise Exception("You must have at least one hidden layer")
+        elif num_hidden_layers == 1:
             self.conv.append(SAGEConv(in_channels, hidden_channels, normalize=False))
             self.conv.append(SAGEConv(hidden_channels, out_channels, normalize=False))
-        elif num_layers > 3:
+        elif num_hidden_layers > 1:
             self.conv.append(SAGEConv(in_channels, hidden_channels, normalize=False))
-            for _ in range(1, num_layers-1):
+            for _ in range(num_hidden_layers - 1):
                 self.conv.append(SAGEConv(hidden_channels, hidden_channels, normalize=False))
             self.conv.append(SAGEConv(hidden_channels, out_channels, normalize=False))
 
 
     def forward(self, x, edge_index):
-        for i in range(self.num_layers):
+        for i, layer in enumerate(self.conv):
             x = F.dropout(x, p=0.2, training=self.training)
-            x = self.conv[i](x, edge_index)
+            x = layer(x, edge_index)
             if i != (self.num_layers - 1):
                 x = F.relu(x)
         return F.log_softmax(x, dim=1)
@@ -41,6 +45,7 @@ def train(data, model, optimizer):
     total_loss = total_nodes = 0
     optimizer.zero_grad()
     logits = model(data.x, data.edge_index)
+    log(-1, "After forward")
     loss = F.nll_loss(logits[data.train_mask], data.y[data.train_mask])
     loss.backward()
     optimizer.step()
@@ -81,24 +86,38 @@ def run():
     logging.info("Loading data: " + str(time_stamp_preprocessing))
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = SAGE(8, dataset.num_features, dataset.num_classes, 1024)
+    num_hidden_layers = 2
+    model = SAGE(num_hidden_layers, dataset.num_features, dataset.num_classes, 1024)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
 
     data = data.to(device)
-    logging.debug("Type of data: " + str(type(data)))
-    logging.debug("Attributes of data: " + str(dir(data)))
-    logging.debug("Type of data.x: " + str(type(data.x)))
-    logging.debug("Storage size of data.x: " + str(data.x.storage().size()))
-    logging.debug("Type of data.edge_index: " + str(type(data.edge_index)))
-    logging.debug("Storage size of data.edge_index: " + str(data.edge_index.storage().size()))
-
     time_stamp_data = time.time() - start
     logging.info("Copying data: " + str(time_stamp_data))
-    
+
+    logging.debug("Type of data: " + str(type(data)))
+    logging.debug("Number of classes {}".format(dataset.num_classes))
+    for attribute in dir(data):
+        if type(data[attribute]) is torch.Tensor:
+            logging.debug("Shape of parameter: {}".format(data[attribute].size()))
+            logging.debug("Data type of parameter: {}".format(data[attribute].dtype))
+            logging.debug("Storage of parameter: {}".format(data[attribute].storage().size()))
+    log(start, "After data.to(device)")
+
     model = model.to(device)
 
     time_stamp_model = time.time() - start
     logging.info("Copying model: " + str(time_stamp_model))
+
+    logging.debug("Type of model: {}".format(type(model)))
+    logging.debug("Model parameter sizes: {}".format([param.size() for param in model.parameters()]))
+    for param in model.parameters():
+        logging.debug("Shape of model parameter {}: {}".format(str(param.names), param.size()))
+        logging.debug("Data type of data.{}: {}".format(str(param.names), param.dtype))
+        logging.debug("Storage of data.{}: {}".format(str(param.names), param.storage().size()))
+    log(start, "After model.to(device)")
+
+    logging.debug("Type of optimizer: {}".format(type(optimizer)))
+    logging.debug("Attributes of optimizer: {}".format(dir(optimizer)))
 
     for epoch in range(1, 31):
         loss = train(data, model, optimizer)
