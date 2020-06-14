@@ -151,23 +151,13 @@ class MessagePassing(torch.nn.Module):
         i, j = (0, 1) if self.flow == 'target_to_source' else (1, 0)
         ij = {'_i': i, '_j': j}
 
-        # debug
-        print("MP type: {}".format(mp_type))
-        print("User arguments: {}".format(self.__user_args__))
-
         out = {}
         for arg in self.__user_args__:
-            # debug
-            print("Argument: {}".format(arg))
-
             if arg[-2:] not in ij.keys():
                 out[arg] = kwargs.get(arg, inspect.Parameter.empty)
             else:
                 idx = ij[arg[-2:]]
                 data = kwargs.get(arg[:-2], inspect.Parameter.empty)
-
-                # debug
-                print("Index: {}".format(idx))
 
                 if data is inspect.Parameter.empty:
                     out[arg] = data
@@ -185,13 +175,6 @@ class MessagePassing(torch.nn.Module):
                 self.__set_size__(size, idx, data)
 
                 if mp_type == 'edge_index':
-                    # debug
-                    print("Type of data: {}".format(type(data)))
-                    print("Node dimension: {}".format(self.node_dim))
-                    print("Data shape: {}".format(data.shape))
-                    print("Edge index shape: {}".format(edge_index.shape))
-                    return out
-
                     out[arg] = data.index_select(self.node_dim,
                                                  edge_index[idx])
                 elif mp_type == 'adj_t' and idx == 1:
