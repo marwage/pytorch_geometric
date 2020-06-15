@@ -10,8 +10,12 @@ import torch
 from torch_sparse import SparseTensor
 from torch_scatter import gather_csr, scatter, segment_csr
 
-from .utils.helpers import unsqueeze
-from .utils.inspector import Inspector, get_type
+from torch_geometric.nn.conv.utils.helpers import unsqueeze
+from torch_geometric.nn.conv.utils.inspector import Inspector, get_type
+
+from mw_logging import log_gpu_memory, log_tensor
+import logging
+
 
 special_args = set([
     'adj_t', 'edge_index_i', 'edge_index_j', 'size_i', 'size_j', 'ptr',
@@ -177,6 +181,8 @@ class MessagePassing(torch.nn.Module):
                 if mp_type == 'edge_index':
                     out[arg] = data.index_select(self.node_dim,
                                                  edge_index[idx])
+                    # debug
+                    log_gpu_memory("After data.index_select")
                 elif mp_type == 'adj_t' and idx == 1:
                     rowptr = edge_index.storage.rowptr()
                     rowptr = unsqueeze(rowptr, dim=0, length=self.node_dim)
@@ -321,10 +327,21 @@ class MessagePassing(torch.nn.Module):
             **kwargs: Any additional data which is needed to construct and
                 aggregate messages, and to update node embeddings.
         """
+
+         #debug
+        logging.debug("--------- propagate ---------")
+
         mp_type, size = self.__determine_type_and_size__(edge_index, size)
 
         # We collect all arguments used for message passing in `kwargs`.
         coll_dict = self.__collect__(edge_index, size, mp_type, kwargs)
+
+        #debug
+        log_gpu_memory("after __collect__")
+        for key in coll_dict.keys():
+            if type(coll_dict[key]) is torch.Tensor:
+                log_tensor(coll_dict[key], key)
+
 
         if mp_type == 'adj_t' and self.__fuse__ and not self.__explain__:
             msg_aggr_kwargs = self.__distribute__(
@@ -336,6 +353,9 @@ class MessagePassing(torch.nn.Module):
             msg_kwargs = self.__distribute__(self.inspector.params['message'],
                                              coll_dict)
             out = self.message(**msg_kwargs)
+
+            # debug
+            log_gpu_memory("After message")
 
             # For `GNNExplainer`, we require separate a separate message and
             # aggregate procedure since this allows us to easily inject an
@@ -352,9 +372,17 @@ class MessagePassing(torch.nn.Module):
                 self.inspector.params['aggregate'], coll_dict)
             out = self.aggregate(out, **aggr_kwargs)
 
+            # debug
+            log_tensor(out, "out after aggregate")
+            log_gpu_memory("After aggregate")
+
         update_kwargs = self.__distribute__(self.inspector.params['update'],
                                             coll_dict)
         out = self.update(out, **update_kwargs)
+
+        # debug
+        log_tensor(out, "out after update")
+        log_gpu_memory("After update")
 
         if self.__record_propagate__:
             lines = self.__trace_collect__(edge_index, size, mp_type, kwargs)
@@ -391,6 +419,12 @@ class MessagePassing(torch.nn.Module):
         that support "add", "mean" and "max" operations as specified in
         :meth:`__init__` by the :obj:`aggr` argument.
         """
+
+        # debug
+        logging.debug("---------- aggregate ----------")
+        log_tensor(inputs, "inputs")
+        log_tensor(index, "index")
+
         if ptr is not None:
             ptr = unsqueeze(ptr, dim=0, length=self.node_dim)
             return segment_csr(inputs, ptr, reduce=self.aggr)

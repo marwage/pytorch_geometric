@@ -6,12 +6,8 @@ import pdb
 import torch
 import torch.nn.functional as F
 from torch_geometric.datasets import Flickr
-from torch_geometric.nn import SAGEConv
-
-
-def log(start, when):
-        mib = pow(2, 20)
-        logging.debug("{:.1f}s:{}:active {:.2f}MiB, allocated {:.2f}MiB, reserved {:.2f}MiB".format(time.time() - start, when, torch.cuda.memory_stats()["active_bytes.all.allocated"] / mib, torch.cuda.memory_allocated() / mib, torch.cuda.memory_reserved() / mib))
+from sage_conv import SAGEConv
+from mw_logging import log_gpu_memory, log_tensor
 
 
 class SAGE(torch.nn.Module):
@@ -43,12 +39,17 @@ class SAGE(torch.nn.Module):
 def train(data, model, optimizer):
     model.train()
     total_loss = total_nodes = 0
+    log_gpu_memory("Before zero_grad")
     optimizer.zero_grad()
+    log_gpu_memory("After zero_grad")
     logits = model(data.x, data.edge_index)
-    log(-1, "After forward")
+    log_gpu_memory("After forward")
     loss = F.nll_loss(logits[data.train_mask], data.y[data.train_mask])
+    log_gpu_memory("After loss")
     loss.backward()
+    log_gpu_memory("After backward")
     optimizer.step()
+    log_gpu_memory("After step")
 
     nodes = data.train_mask.sum().item()
     total_loss = loss.item() * nodes
@@ -94,27 +95,27 @@ def run():
     time_stamp_data = time.time() - start
     logging.info("Copying data: " + str(time_stamp_data))
 
+    logging.debug("---------- data ----------")
     logging.debug("Type of data: " + str(type(data)))
     logging.debug("Number of classes {}".format(dataset.num_classes))
     for attribute in dir(data):
         if type(data[attribute]) is torch.Tensor:
-            logging.debug("Shape of parameter: {}".format(data[attribute].size()))
-            logging.debug("Data type of parameter: {}".format(data[attribute].dtype))
-            logging.debug("Storage of parameter: {}".format(data[attribute].storage().size()))
-    log(start, "After data.to(device)")
+            logging.debug("Shape of attribute {}: {}".format(attribute, data[attribute].size()))
+            logging.debug("Data type of attribute {}: {}".format(attribute, data[attribute].dtype))
+            logging.debug("Storage of attribute {}: {}".format(attribute, data[attribute].storage().size()))
+            logging.debug("Pointer of attribute {}: {}".format(attribute, data[attribute].storage().data_ptr()))
+    log_gpu_memory("After data.to(device)", start)
 
     model = model.to(device)
 
     time_stamp_model = time.time() - start
     logging.info("Copying model: " + str(time_stamp_model))
 
+    logging.debug("-------- model ---------")
     logging.debug("Type of model: {}".format(type(model)))
-    logging.debug("Model parameter sizes: {}".format([param.size() for param in model.parameters()]))
-    for param in model.parameters():
-        logging.debug("Shape of model parameter {}: {}".format(str(param.names), param.size()))
-        logging.debug("Data type of data.{}: {}".format(str(param.names), param.dtype))
-        logging.debug("Storage of data.{}: {}".format(str(param.names), param.storage().size()))
-    log(start, "After model.to(device)")
+    for i, param in enumerate(model.parameters()):
+        log_tensor(param, "param {}".format(i))
+    log_gpu_memory("After model.to(device)", start)
 
     logging.debug("Type of optimizer: {}".format(type(optimizer)))
     logging.debug("Attributes of optimizer: {}".format(dir(optimizer)))
@@ -124,6 +125,7 @@ def run():
         accs = test(data, model)
         logging.info('Epoch: {:02d}, Loss: {:.4f}, Train: {:.4f}, Val: {:.4f}, '
             'Test: {:.4f}'.format(epoch, loss, *accs))
+        # logging.info("Epoch: {:02d}, Loss: {:.4f}".format(epoch, loss))
 
     time_stamp_training = time.time() - start
     logging.info("Training: " + str(time_stamp_training))

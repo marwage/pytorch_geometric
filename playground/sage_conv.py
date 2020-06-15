@@ -1,7 +1,9 @@
 import torch
 import torch.nn.functional as F
 from torch.nn import Linear
-from torch_geometric.nn.conv import MessagePassing
+from message_passing import MessagePassing
+from mw_logging import log_tensor
+import logging
 
 
 class SAGEConv(MessagePassing):
@@ -45,6 +47,8 @@ class SAGEConv(MessagePassing):
     def forward(self, x, edge_index, edge_weight=None):
         """"""
 
+        logging.debug("---------- forward ----------")
+
         if torch.is_tensor(x):
             x = (x, x)
 
@@ -54,9 +58,15 @@ class SAGEConv(MessagePassing):
         if self.normalize:
             out = F.normalize(out, p=2, dim=-1)
 
+        log_tensor(out, "Layer out")
+        logging.debug("---------- end of forward ----------")
+
         return out
 
     def message(self, x_j, edge_weight):
+        logging.debug("---------- message ----------")
+        log_tensor(x_j, "x_j")
+
         return x_j if edge_weight is None else edge_weight.view(-1, 1) * x_j
 
     def __repr__(self):
