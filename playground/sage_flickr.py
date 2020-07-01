@@ -87,8 +87,10 @@ def run():
     logging.info("Loading data: " + str(time_stamp_preprocessing))
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # device = "cpu"
+    
     num_hidden_layers = 2
-    model = SAGE(num_hidden_layers, dataset.num_features, dataset.num_classes, 1024)
+    model = SAGE(num_hidden_layers, dataset.num_features, dataset.num_classes, 512)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
 
     data = data.to(device)
