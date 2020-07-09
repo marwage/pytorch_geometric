@@ -10,8 +10,8 @@ import torch
 from torch_sparse import SparseTensor
 from torch_scatter import gather_csr, scatter, segment_csr
 
-from torch_geometric.nn.conv.utils.helpers import unsqueeze
-from torch_geometric.nn.conv.utils.inspector import Inspector, get_type
+# from torch_geometric.nn.conv.utils.helpers import unsqueeze
+from torch_geometric.nn.conv.utils.inspector import Inspector
 
 import mw_logging
 import logging
@@ -184,7 +184,7 @@ class MessagePassing(torch.nn.Module):
                     mw_logging.log_peak_increase("after data.index_select of {}".format(arg))
                 elif mp_type == 'adj_t' and idx == 1:
                     rowptr = edge_index.storage.rowptr()
-                    rowptr = unsqueeze(rowptr, dim=0, length=self.node_dim)
+                    # rowptr = unsqueeze(rowptr, dim=0, length=self.node_dim)
                     out[arg] = gather_csr(data, rowptr)
                 elif mp_type == 'adj_t' and idx == 0:
                     col = edge_index.storage.col()
@@ -426,7 +426,7 @@ class MessagePassing(torch.nn.Module):
         mw_logging.log_tensor(index, "index")
 
         if ptr is not None:
-            ptr = unsqueeze(ptr, dim=0, length=self.node_dim)
+            # ptr = unsqueeze(ptr, dim=0, length=self.node_dim)
             return segment_csr(inputs, ptr, reduce=self.aggr)
         else:
             return scatter(inputs, index, dim=self.node_dim, dim_size=dim_size,
@@ -466,7 +466,7 @@ class MessagePassing(torch.nn.Module):
         init_args = re.sub(r'=(.*?)\)', ')', init_args)
 
         # `propagate` substitution.
-        prop_types = [f'{k}: {get_type(v)}' for k, v in prop_kwargs.items()]
+        # prop_types = [f'{k}: {get_type(v)}' for k, v in prop_kwargs.items()]
         prop_tuple_def = f'class Propagate_{uid}(NamedTuple):\n'
         prop_tuple_def += '\n'.join([' ' * 4 + x for x in prop_types])
         prop_types = ', '.join(prop_types)
