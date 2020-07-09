@@ -6,7 +6,7 @@ import pdb
 import torch
 import torch.nn.functional as F
 from torch_geometric.datasets import Reddit
-from sage_conv import SAGEConv
+from torch_geometric.nn import SAGEConv
 from mw_logging import log_gpu_memory, log_tensor
 
 
