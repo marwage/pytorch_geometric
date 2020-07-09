@@ -5,9 +5,11 @@ import subprocess
 import pdb
 import torch
 import torch.nn.functional as F
+import torch_geometric.transforms as T
 from torch_geometric.datasets import Reddit
 from torch_geometric.nn import SAGEConv
 from mw_logging import log_gpu_memory, log_tensor
+from torch_sparse import SparseTensor
 
 
 class SAGE(torch.nn.Module):
@@ -42,7 +44,7 @@ def train(data, model, optimizer):
     log_gpu_memory("Before zero_grad")
     optimizer.zero_grad()
     log_gpu_memory("After zero_grad")
-    logits = model(data.x, data.edge_index)
+    logits = model(data.x, data.adj_t)
     log_gpu_memory("After forward")
     loss = F.nll_loss(logits[data.train_mask], data.y[data.train_mask])
     log_gpu_memory("After loss")
@@ -62,7 +64,7 @@ def train(data, model, optimizer):
 def test(data, model):
     model.eval()
     total_correct, total_nodes = [0, 0, 0], [0, 0, 0]
-    logits = model(data.x, data.edge_index)
+    logits = model(data.x, data.adj_t)
     pred = logits.argmax(dim=1)
 
     masks = [data.train_mask, data.val_mask, data.test_mask]
@@ -80,7 +82,7 @@ def run():
     start = time.time()
 
     path = osp.join(osp.dirname(osp.realpath(__file__)), '..', 'data', 'Reddit')
-    dataset = Reddit(path)
+    dataset = Reddit(path, transform=T.ToSparseTensor())
     data = dataset[0]
 
     time_stamp_preprocessing = time.time() - start
@@ -107,6 +109,8 @@ def run():
             logging.debug("Data type of attribute {}: {}".format(attribute, data[attribute].dtype))
             logging.debug("Storage of attribute {}: {}".format(attribute, data[attribute].storage().size()))
             logging.debug("Pointer of attribute {}: {}".format(attribute, data[attribute].storage().data_ptr()))
+        if type(data[attribute]) is SparseTensor:
+            logging.debug("{} is SparseTensor".format(attribute))
     log_gpu_memory("After data.to(device)", start)
 
     model = model.to(device)
@@ -123,7 +127,8 @@ def run():
     logging.debug("Type of optimizer: {}".format(type(optimizer)))
     logging.debug("Attributes of optimizer: {}".format(dir(optimizer)))
 
-    for epoch in range(1, 31):
+    num_epochs = 30
+    for epoch in range(1, num_epochs + 1):
         loss = train(data, model, optimizer)
         accs = test(data, model)
         logging.info('Epoch: {:02d}, Loss: {:.4f}, Train: {:.4f}, Val: {:.4f}, '
