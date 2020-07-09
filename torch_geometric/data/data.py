@@ -1,6 +1,6 @@
 import re
 import copy
-import warnings
+import logging
 
 import torch
 import torch_geometric
@@ -20,7 +20,9 @@ __num_nodes_warn_msg__ = (
 
 def size_repr(key, item, indent=0):
     indent_str = ' ' * indent
-    if torch.is_tensor(item):
+    if torch.is_tensor(item) and item.dim() == 0:
+        out = item.item()
+    elif torch.is_tensor(item):
         out = str(list(item.size()))
     elif isinstance(item, SparseTensor):
         out = str(item.sizes())[:-1] + f', nnz={item.nnz()}]'
@@ -29,6 +31,8 @@ def size_repr(key, item, indent=0):
     elif isinstance(item, dict):
         lines = [indent_str + size_repr(k, v, 2) for k, v in item.items()]
         out = '{\n' + ',\n'.join(lines) + '\n' + indent_str + '}'
+    elif isinstance(item, str):
+        out = f'"{item}"'
     else:
         out = str(item)
 
@@ -154,12 +158,16 @@ class Data(object):
             if the batch concatenation process is corrupted for a specific data
             attribute.
         """
-        # `*index*` and `*face*` should be concatenated in the last dimension,
-        # everything else in the first dimension.
-        return -1 if bool(re.search('(index|face)', key)) else 0
+        # Concatenate `*index*` and `*face*` attributes in the last dimension.
+        if bool(re.search('(index|face)', key)):
+            return -1
+        # By default, concatenate sparse matrices diagonally.
+        elif isinstance(value, SparseTensor):
+            return (0, 1)
+        return 0
 
     def __inc__(self, key, value):
-        r""""Returns the incremental count to cumulatively increase the value
+        r"""Returns the incremental count to cumulatively increase the value
         of the next attribute of :obj:`key` when creating batches.
 
         .. note::
@@ -168,8 +176,8 @@ class Data(object):
             if the batch concatenation process is corrupted for a specific data
             attribute.
         """
-        # Only `*index*` and `*face*` should be cumulatively summed up when
-        # creating batches.
+        # Only `*index*` and `*face*` attributes should be cumulatively summed
+        # up when creating batches.
         return self.num_nodes if bool(re.search('(index|face)', key)) else 0
 
     @property
@@ -193,11 +201,15 @@ class Data(object):
             return self.__num_nodes__
         for key, item in self('x', 'pos', 'norm', 'batch'):
             return item.size(self.__cat_dim__(key, item))
+        if hasattr(self, 'adj'):
+            return self.adj.size(0)
+        if hasattr(self, 'adj_t'):
+            return self.adj_t.size(1)
         if self.face is not None:
-            warnings.warn(__num_nodes_warn_msg__.format('face'))
+            logging.warning(__num_nodes_warn_msg__.format('face'))
             return maybe_num_nodes(self.face)
         if self.edge_index is not None:
-            warnings.warn(__num_nodes_warn_msg__.format('edge'))
+            logging.warning(__num_nodes_warn_msg__.format('edge'))
             return maybe_num_nodes(self.edge_index)
         return None
 
@@ -271,8 +283,15 @@ class Data(object):
         return not self.is_undirected()
 
     def __apply__(self, item, func):
-        if torch.is_tensor(item) or isinstance(item, SparseTensor):
+        if torch.is_tensor(item):
             return func(item)
+        elif isinstance(item, SparseTensor):
+            # Not all apply methods are supported for `SparseTensor`, e.g.,
+            # `contiguous()`. We can get around it by capturing the exception.
+            try:
+                return func(item)
+            except AttributeError:
+                return item
         elif isinstance(item, (tuple, list)):
             return [self.__apply__(v, func) for v in item]
         elif isinstance(item, dict):

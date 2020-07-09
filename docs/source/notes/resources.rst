@@ -10,3 +10,7 @@ External Resources
 * Nicolas Chaulet *et al.*: **PyTorch Points 3D** - A framework for running common deep learning models for point cloud analysis tasks that heavily relies on Pytorch Geometric [`Github <https://github.com/nicolas-chaulet/torch-points3d>`__, `Documentation <https://torch-points3d.readthedocs.io/en/latest/>`__]
 
 * Weihua Hu *et al.*: **Open Graph Benchmark** - A collection of large-scale benchmark datasets, data loaders, and evaluators for graph machine learning, including PyTorch Geometric support and examples [`Website <https://ogb.stanford.edu>`__, `GitHub <https://github.com/snap-stanford/ogb>`__]
+
+* **DeepSNAP** - A PyTorch library that bridges between graph libraries such as NetworkX and PyTorch Geometric [`GitHub <https://github.com/snap-stanford/deepsnap>`__, `Documentation <https://snap.stanford.edu/deepsnap/>`__]
+
+* Benedek Rozemberczki: **PyTorch Geometric Temporal** - A temporal GNN library built upon PyTorch Geometric [`GitHub <https://github.com/benedekrozemberczki/pytorch_geometric_temporal>`__, `Documentation <https://pytorch-geometric-temporal.readthedocs.io/en/latest/>`__]

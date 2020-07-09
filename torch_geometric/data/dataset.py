@@ -1,8 +1,7 @@
-import copy
-import collections
-import os.path as osp
-import warnings
 import re
+import copy
+import logging
+import os.path as osp
 
 import torch.utils.data
 
@@ -10,7 +9,7 @@ from .makedirs import makedirs
 
 
 def to_list(x):
-    if not isinstance(x, collections.Iterable) or isinstance(x, str):
+    if not isinstance(x, (tuple, list)) or isinstance(x, str):
         x = [x]
     return x
 
@@ -144,14 +143,14 @@ class Dataset(torch.utils.data.Dataset):
     def _process(self):
         f = osp.join(self.processed_dir, 'pre_transform.pt')
         if osp.exists(f) and torch.load(f) != __repr__(self.pre_transform):
-            warnings.warn(
+            logging.warning(
                 'The `pre_transform` argument differs from the one used in '
                 'the pre-processed version of this dataset. If you really '
                 'want to make use of another pre-processing technique, make '
                 'sure to delete `{}` first.'.format(self.processed_dir))
         f = osp.join(self.processed_dir, 'pre_filter.pt')
         if osp.exists(f) and torch.load(f) != __repr__(self.pre_filter):
-            warnings.warn(
+            logging.warning(
                 'The `pre_filter` argument differs from the one used in the '
                 'pre-processed version of this dataset. If you really want to '
                 'make use of another pre-fitering technique, make sure to '
