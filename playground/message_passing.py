@@ -13,7 +13,7 @@ from torch_scatter import gather_csr, scatter, segment_csr
 from torch_geometric.nn.conv.utils.helpers import unsqueeze
 from torch_geometric.nn.conv.utils.inspector import Inspector, get_type
 
-from mw_logging import log_gpu_memory, log_tensor
+import mw_logging
 import logging
 
 
@@ -181,8 +181,7 @@ class MessagePassing(torch.nn.Module):
                 if mp_type == 'edge_index':
                     out[arg] = data.index_select(self.node_dim,
                                                  edge_index[idx])
-                    # debug
-                    log_gpu_memory("After data.index_select")
+                    mw_logging.log_peak_increase("after data.index_select of {}".format(arg))
                 elif mp_type == 'adj_t' and idx == 1:
                     rowptr = edge_index.storage.rowptr()
                     rowptr = unsqueeze(rowptr, dim=0, length=self.node_dim)
@@ -337,10 +336,11 @@ class MessagePassing(torch.nn.Module):
         coll_dict = self.__collect__(edge_index, size, mp_type, kwargs)
 
         #debug
-        log_gpu_memory("after __collect__")
+        mw_logging.log_peak_increase("after __collect__")
         for key in coll_dict.keys():
+            logging.debug("key: {}".format(key))
             if type(coll_dict[key]) is torch.Tensor:
-                log_tensor(coll_dict[key], key)
+                mw_logging.log_tensor(coll_dict[key], key)
 
 
         if mp_type == 'adj_t' and self.__fuse__ and not self.__explain__:
@@ -355,7 +355,7 @@ class MessagePassing(torch.nn.Module):
             out = self.message(**msg_kwargs)
 
             # debug
-            log_gpu_memory("After message")
+            mw_logging.log_peak_increase("After message")
 
             # For `GNNExplainer`, we require separate a separate message and
             # aggregate procedure since this allows us to easily inject an
@@ -373,16 +373,16 @@ class MessagePassing(torch.nn.Module):
             out = self.aggregate(out, **aggr_kwargs)
 
             # debug
-            log_tensor(out, "out after aggregate")
-            log_gpu_memory("After aggregate")
+            mw_logging.log_tensor(out, "out after aggregate")
+            mw_logging.log_peak_increase("After aggregate")
 
         update_kwargs = self.__distribute__(self.inspector.params['update'],
                                             coll_dict)
         out = self.update(out, **update_kwargs)
 
         # debug
-        log_tensor(out, "out after update")
-        log_gpu_memory("After update")
+        mw_logging.log_tensor(out, "out after update")
+        mw_logging.log_peak_increase("After update")
 
         if self.__record_propagate__:
             lines = self.__trace_collect__(edge_index, size, mp_type, kwargs)
@@ -422,8 +422,8 @@ class MessagePassing(torch.nn.Module):
 
         # debug
         logging.debug("---------- aggregate ----------")
-        log_tensor(inputs, "inputs")
-        log_tensor(index, "index")
+        mw_logging.log_tensor(inputs, "inputs")
+        mw_logging.log_tensor(index, "index")
 
         if ptr is not None:
             ptr = unsqueeze(ptr, dim=0, length=self.node_dim)
