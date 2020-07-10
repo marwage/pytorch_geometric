@@ -7,9 +7,11 @@ import torch
 import torch.nn.functional as F
 import torch_geometric.transforms as T
 from torch_geometric.datasets import Reddit
-from torch_geometric.nn import SAGEConv
-from mw_logging import log_gpu_memory, log_tensor
+# from torch_geometric.nn import SAGEConv
+
+from sage_conv import SAGEConv
 from torch_sparse import SparseTensor
+import mw_logging
 
 
 class SAGE(torch.nn.Module):
@@ -30,28 +32,43 @@ class SAGE(torch.nn.Module):
 
 
     def forward(self, x, edge_index):
+        logging.debug("---------- SAGE.forward ----------")
+        mw_logging.log_tensor(x, "x in")
         for i, layer in enumerate(self.conv):
+            logging.debug("---------- layer forward ----------")
             x = F.dropout(x, p=0.2, training=self.training)
+            mw_logging.log_tensor(x, "after dropout")
+            mw_logging.log_peak_increase("after dropout")
             x = layer(x, edge_index)
+            mw_logging.log_tensor(x, "after layer")
+            mw_logging.log_peak_increase("after layer")
             if i != (self.num_layers - 1):
                 x = F.relu(x)
-        return F.log_softmax(x, dim=1)
+                mw_logging.log_tensor(x, "after relu")
+                mw_logging.log_peak_increase("after relu")
+        softmax = F.log_softmax(x, dim=1)
+        mw_logging.log_tensor(softmax, "after softmax")
+        mw_logging.log_peak_increase("after softmax")
+        return softmax
 
 
 def train(data, model, optimizer):
     model.train()
     total_loss = total_nodes = 0
-    log_gpu_memory("Before zero_grad")
+    mw_logging.log_peak_increase("Before zero_grad")
     optimizer.zero_grad()
-    log_gpu_memory("After zero_grad")
+    mw_logging.log_peak_increase("After zero_grad")
     logits = model(data.x, data.adj_t)
-    log_gpu_memory("After forward")
+    mw_logging.log_tensor(logits, "logits")
+    mw_logging.log_peak_increase("After forward")
     loss = F.nll_loss(logits[data.train_mask], data.y[data.train_mask])
-    log_gpu_memory("After loss")
+    mw_logging.log_peak_increase("After loss")
     loss.backward()
-    log_gpu_memory("After backward")
+    mw_logging.log_peak_increase("After backward")
+    for i, param in enumerate(model.parameters()):
+        mw_logging.log_tensor(param, "param {}".format(i))
     optimizer.step()
-    log_gpu_memory("After step")
+    mw_logging.log_peak_increase("After step")
 
     nodes = data.train_mask.sum().item()
     total_loss = loss.item() * nodes
@@ -89,7 +106,6 @@ def run():
     logging.info("Loading data: " + str(time_stamp_preprocessing))
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    # device = "cpu"
 
     num_hidden_layers = 2
     num_hidden_channels = 512
@@ -103,15 +119,15 @@ def run():
     logging.debug("---------- data ----------")
     logging.debug("Type of data: " + str(type(data)))
     logging.debug("Number of classes {}".format(dataset.num_classes))
+    logging.debug("Number of edges {}".format(data.num_edges))
     for attribute in dir(data):
         if type(data[attribute]) is torch.Tensor:
-            logging.debug("Shape of attribute {}: {}".format(attribute, data[attribute].size()))
-            logging.debug("Data type of attribute {}: {}".format(attribute, data[attribute].dtype))
-            logging.debug("Storage of attribute {}: {}".format(attribute, data[attribute].storage().size()))
-            logging.debug("Pointer of attribute {}: {}".format(attribute, data[attribute].storage().data_ptr()))
+            mw_logging.log_tensor(data[attribute], attribute)
         if type(data[attribute]) is SparseTensor:
-            logging.debug("{} is SparseTensor".format(attribute))
-    log_gpu_memory("After data.to(device)", start)
+            storage = data[attribute].storage
+            mw_logging.log_sparse_storage(storage, attribute)
+            
+    mw_logging.log_peak_increase("After data.to(device)")
 
     model = model.to(device)
 
@@ -121,13 +137,14 @@ def run():
     logging.debug("-------- model ---------")
     logging.debug("Type of model: {}".format(type(model)))
     for i, param in enumerate(model.parameters()):
-        log_tensor(param, "param {}".format(i))
-    log_gpu_memory("After model.to(device)", start)
+        mw_logging.log_tensor(param, "param {}".format(i))
+    mw_logging.log_peak_increase("After model.to(device)")
 
     logging.debug("Type of optimizer: {}".format(type(optimizer)))
     logging.debug("Attributes of optimizer: {}".format(dir(optimizer)))
 
-    num_epochs = 30
+    # num_epochs = 30
+    num_epochs = 1
     for epoch in range(1, num_epochs + 1):
         loss = train(data, model, optimizer)
         accs = test(data, model)
@@ -137,6 +154,7 @@ def run():
 
     time_stamp_training = time.time() - start
     logging.info("Training: " + str(time_stamp_training))
+    mw_logging.log_gpu_memory("End of training")
 
     monitoring_gpu.terminate()
 

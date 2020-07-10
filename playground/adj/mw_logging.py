@@ -1,7 +1,7 @@
 import logging
 import time
 import torch
-
+from torch_sparse import SparseStorage
 
 max_peak_allocated = 0
 mib = pow(2, 20)
@@ -18,9 +18,10 @@ def log_gpu_memory(when, start=0):
     logging.debug("{:.2f}s:{}:active.peak {:.2f}MiB;allocated.peak {:.2f}MiB;reserved.peak {:.2f}MiB".format(since_start, when, stats["active_bytes.all.peak"] / mib, stats["allocated_bytes.all.peak"] / mib, stats["reserved_bytes.all.peak"] / mib))
 
 def log_tensor(tensor, name="?"):
-    logging.debug("{}:shape {};data type {};pointer {};size {}".format(name, tensor.size(), tensor.dtype, tensor.storage().data_ptr(), tensor.storage().size()))
-    if tensor.grad is not None:
-        logging.debug("{}:shape {};data type {};pointer {};size {}".format(name + ".grad", tensor.grad.size(), tensor.grad.dtype, tensor.grad.storage().data_ptr(), tensor.grad.storage().size()))
+    if tensor is not None:
+        logging.debug("{}:shape {};data type {};pointer {};size {}".format(name, tensor.size(), tensor.dtype, tensor.storage().data_ptr(), tensor.storage().size()))
+        if tensor.grad is not None:
+            logging.debug("{}:shape {};data type {};pointer {};size {}".format(name + ".grad", tensor.grad.size(), tensor.grad.dtype, tensor.grad.storage().data_ptr(), tensor.grad.storage().size()))
 
 def log_peak_increase(when:str, device=None):
     global max_peak_allocated
@@ -31,3 +32,14 @@ def log_peak_increase(when:str, device=None):
         max_peak_allocated = max_allocated
     else:
         logging.debug("{}:No increase of allocated_bytes.all.peak".format(when))
+
+def log_sparse_storage(storage: SparseStorage, name="?"):
+    log_tensor(storage._row, "{} row".format(name))
+    log_tensor(storage._rowptr, "{} rowptr".format(name))
+    log_tensor(storage._col, "{} column".format(name))
+    log_tensor(storage._value, "{} value".format(name))
+    log_tensor(storage._rowcount, "{} rowcount".format(name))
+    log_tensor(storage._colptr, "{} colptr".format(name))
+    log_tensor(storage._colcount, "{} colcount".format(name))
+    log_tensor(storage._csr2csc, "{} csr2csc".format(name))
+    log_tensor(storage._csc2csr, "{} csc2csr".format(name))
