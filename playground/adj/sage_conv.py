@@ -64,6 +64,7 @@ class SAGEConv(MessagePassing):
         mw_logging.log_peak_increase("after propagate")
         out = self.lin_l(out)
         mw_logging.log_peak_increase("after linear link")
+        mw_logging.log_gpu_memory("after linear link")
 
         x_r = x[1]
         if x_r is not None:

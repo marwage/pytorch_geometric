@@ -6,7 +6,7 @@ import pdb
 import torch
 import torch.nn.functional as F
 import torch_geometric.transforms as T
-from torch_geometric.datasets import Reddit
+from ogb.nodeproppred import PygNodePropPredDataset, Evaluator
 # from torch_geometric.nn import SAGEConv
 
 from sage_conv import SAGEConv
@@ -52,7 +52,7 @@ class SAGE(torch.nn.Module):
         return softmax
 
 
-def train(data, model, optimizer):
+def train(data, model, optimizer, train_idx):
     model.train()
     total_loss = total_nodes = 0
     mw_logging.log_peak_increase("Before zero_grad")
@@ -61,7 +61,7 @@ def train(data, model, optimizer):
     logits = model(data.x, data.adj_t)
     mw_logging.log_tensor(logits, "logits")
     mw_logging.log_peak_increase("After forward")
-    loss = F.nll_loss(logits[data.train_mask], data.y[data.train_mask])
+    loss = F.nll_loss(train_idx, train_idx)
     mw_logging.log_peak_increase("After loss")
     loss.backward()
     mw_logging.log_peak_increase("After backward")
@@ -93,13 +93,16 @@ def test(data, model):
 
 
 def run():
-    name = "sage_reddit"
+    name = "sage_products"
     monitoring_gpu = subprocess.Popen(["nvidia-smi", "dmon", "-s", "umt", "-o", "T", "-f", f"{name}.smi"])
     logging.basicConfig(filename=f"{name}.log",level=logging.DEBUG)
     start = time.time()
 
-    path = osp.join(osp.dirname(osp.realpath(__file__)), '..', 'data', 'Reddit')
-    dataset = Reddit(path, transform=T.ToSparseTensor())
+    root = osp.join(osp.dirname(osp.realpath(__file__)), '..', 'data', 'products')
+    dataset = PygNodePropPredDataset('ogbn-products', root, transform=T.ToSparseTensor())
+    split_idx = dataset.get_idx_split()
+    train_idx = split_idx['train']
+    evaluator = Evaluator(name='ogbn-products')
     data = dataset[0]
 
     time_stamp_preprocessing = time.time() - start
@@ -146,7 +149,7 @@ def run():
     # num_epochs = 30
     num_epochs = 1
     for epoch in range(1, num_epochs + 1):
-        loss = train(data, model, optimizer)
+        loss = train(data, model, optimizer, train_idx)
         accs = test(data, model)
         logging.info('Epoch: {:02d}, Loss: {:.4f}, Train: {:.4f}, Val: {:.4f}, '
             'Test: {:.4f}'.format(epoch, loss, *accs))
