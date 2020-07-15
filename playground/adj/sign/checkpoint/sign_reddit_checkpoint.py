@@ -11,6 +11,7 @@ from torch_geometric.datasets import Reddit
 
 from torch_sparse import SparseTensor
 import mw_logging
+from torch.utils.checkpoint import checkpoint
 
 
 class SIGN(torch.nn.Module):
@@ -33,7 +34,8 @@ class SIGN(torch.nn.Module):
                 mw_logging.log_tensor(x_i, "x_{}".format(i))
         for i, lin in enumerate(self.lins):
             logging.debug("---------- layer.forward ----------")
-            linear = lin(xs[i])
+            # linear = lin(xs[i])
+            linear = checkpoint(lin, xs[i])
             mw_logging.log_peak_increase("After linear")
             mw_logging.log_tensor(linear, "linear")
             rlu = F.relu(linear)
@@ -46,7 +48,8 @@ class SIGN(torch.nn.Module):
         x = torch.cat(xs, dim=-1)
         mw_logging.log_peak_increase("After concatenate xs")
         mw_logging.log_tensor(x, "concatenate xs")
-        x = self.lin(x)
+        # x = self.lin(x)
+        x = checkpoint(self.lin, x)
         mw_logging.log_peak_increase("After lin")
         mw_logging.log_tensor(x, "lin")
         soft = F.log_softmax(x, dim=-1)
@@ -96,7 +99,7 @@ def test(data, model):
 
 
 def run():
-    name = "sign_reddit"
+    name = "sign_reddit_checkpoint"
     monitoring_gpu = subprocess.Popen(["nvidia-smi", "dmon", "-s", "umt", "-o", "T", "-f", f"{name}.smi"])
     logging.basicConfig(filename=f"{name}.log",level=logging.DEBUG)
     start = time.time()
