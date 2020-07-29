@@ -219,24 +219,24 @@ class MessagePassing(torch.nn.Module):
             coll_dict = self.__collect__(self.__fused_user_args__, edge_index,
                                          size, kwargs)
 
-            mw_logging.log_peak_increase("after __collect__")
-            for key in coll_dict.keys():
-                logging.debug("key: {}".format(key))
-                if type(coll_dict[key]) is torch.Tensor:
-                    mw_logging.log_tensor(coll_dict[key], key)
+            # mw_logging.log_peak_increase("after __collect__")
+            # for key in coll_dict.keys():
+            #     logging.debug("key: {}".format(key))
+            #     if type(coll_dict[key]) is torch.Tensor:
+            #         mw_logging.log_tensor(coll_dict[key], key)
 
             msg_aggr_kwargs = self.inspector.distribute(
                 'message_and_aggregate', coll_dict)
             out = self.message_and_aggregate(edge_index, **msg_aggr_kwargs)
 
-            mw_logging.log_peak_increase("after message_and_aggregate")
-            mw_logging.log_tensor(out, "out of message_and_aggregate")
+            # mw_logging.log_peak_increase("after message_and_aggregate")
+            # mw_logging.log_tensor(out, "out of message_and_aggregate")
 
             update_kwargs = self.inspector.distribute('update', coll_dict)
             out = self.update(out, **update_kwargs)
             
-            mw_logging.log_peak_increase("after update")
-            mw_logging.log_tensor(out, "out of update")
+            # mw_logging.log_peak_increase("after update")
+            # mw_logging.log_tensor(out, "out of update")
 
             return out
 

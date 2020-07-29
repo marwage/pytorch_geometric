@@ -24,47 +24,47 @@ class SIGN(torch.nn.Module):
             self.lins.append(Linear(in_channels, hidden_channels))
         self.lin = Linear((self.k + 1) * hidden_channels, out_channels)
 
-    def forward(self, data):
+    def forward(self, xs):
         logging.debug("---------- SIGN.forward ----------")
-        xs = [data.x] + [data[f'x{i}'] for i in range(1, self.k + 1)]
-        mw_logging.log_peak_increase("After xs")
+        # mw_logging.log_peak_increase("After xs")
+        hs = []
         for i, x_i in enumerate(xs):
-            if x_i is torch.Tensor:
+            if type(x_i) is torch.Tensor:
                 mw_logging.log_tensor(x_i, "x_{}".format(i))
         for i, lin in enumerate(self.lins):
             logging.debug("---------- layer.forward ----------")
             linear = lin(xs[i])
-            mw_logging.log_peak_increase("After linear")
+            # mw_logging.log_peak_increase("After linear")
             mw_logging.log_tensor(linear, "linear")
             rlu = F.relu(linear)
-            mw_logging.log_peak_increase("After relu")
+            # mw_logging.log_peak_increase("After relu")
             mw_logging.log_tensor(rlu, "relu")
             dropo = F.dropout(rlu, p=0.2, training=self.training)
-            mw_logging.log_peak_increase("After dropout")
+            # mw_logging.log_peak_increase("After dropout")
             mw_logging.log_tensor(dropo, "dropo")
-            xs[i] = dropo
-        x = torch.cat(xs, dim=-1)
-        mw_logging.log_peak_increase("After concatenate xs")
+            hs.append(dropo)
+        x = torch.cat(hs, dim=-1)
+        # mw_logging.log_peak_increase("After concatenate xs")
         mw_logging.log_tensor(x, "concatenate xs")
         x = self.lin(x)
-        mw_logging.log_peak_increase("After lin")
+        # mw_logging.log_peak_increase("After lin")
         mw_logging.log_tensor(x, "lin")
         soft = F.log_softmax(x, dim=-1)
-        mw_logging.log_peak_increase("After softmax")
+        # mw_logging.log_peak_increase("After softmax")
         mw_logging.log_tensor(soft, "softmax")
         return soft
 
 
-def train(data, model, optimizer):
+def train(xs, y, train_mask, model, optimizer):
     model.train()
     total_loss = total_nodes = 0
     mw_logging.log_peak_increase("Before zero_grad")
     optimizer.zero_grad()
     mw_logging.log_peak_increase("After zero_grad")
-    logits = model(data)
+    logits = model(xs)
     mw_logging.log_tensor(logits, "logits")
     mw_logging.log_peak_increase("After forward")
-    loss = F.nll_loss(logits[data.train_mask], data.y[data.train_mask])
+    loss = F.nll_loss(logits[train_mask], y[train_mask])
     mw_logging.log_peak_increase("After loss")
     loss.backward()
     mw_logging.log_peak_increase("After backward")
@@ -73,7 +73,7 @@ def train(data, model, optimizer):
     optimizer.step()
     mw_logging.log_peak_increase("After step")
 
-    nodes = data.train_mask.sum().item()
+    nodes = train_mask.sum().item()
     total_loss = loss.item() * nodes
     total_nodes = nodes
 
@@ -81,15 +81,14 @@ def train(data, model, optimizer):
 
 
 @torch.no_grad()
-def test(data, model):
+def test(xs, y, masks, model):
     model.eval()
     total_correct, total_nodes = [0, 0, 0], [0, 0, 0]
-    logits = model(data)
+    logits = model(xs)
     pred = logits.argmax(dim=1)
 
-    masks = [data.train_mask, data.val_mask, data.test_mask]
     for i, mask in enumerate(masks):
-        total_correct[i] = (pred[mask] == data.y[mask]).sum().item()
+        total_correct[i] = (pred[mask] == y[mask]).sum().item()
         total_nodes[i] = mask.sum().item()
 
     return (torch.Tensor(total_correct) / torch.Tensor(total_nodes)).tolist()
@@ -116,7 +115,12 @@ def run():
     model = SIGN(k, dataset.num_features, dataset.num_classes, num_hidden_channels)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
 
-    data = data.to(device)
+    xs = [data.x.to(device)] + [data[f'x{i}'].to(device) for i in range(1, k + 1)]
+    y = data.y.to(device)
+    train_mask = data.train_mask.to(device)
+    val_mask = data.val_mask.to(device)
+    test_mask = data.test_mask.to(device)
+    masks = [train_mask, val_mask, test_mask]
     time_stamp_data = time.time() - start
     logging.info("Copying data: " + str(time_stamp_data))
 
@@ -148,13 +152,13 @@ def run():
     logging.debug("Attributes of optimizer: {}".format(dir(optimizer)))
 
     # num_epochs = 30
-    num_epochs = 1
+    num_epochs = 2
     for epoch in range(1, num_epochs + 1):
-        loss = train(data, model, optimizer)
-        accs = test(data, model)
+        loss = train(xs, y, train_mask, model, optimizer)
+        accs = test(xs, y, masks, model)
         logging.info('Epoch: {:02d}, Loss: {:.4f}, Train: {:.4f}, Val: {:.4f}, '
             'Test: {:.4f}'.format(epoch, loss, *accs))
-        # logging.info("Epoch: {:02d}, Loss: {:.4f}".format(epoch, loss))
+        logging.info("Epoch: {:02d}, Loss: {:.4f}".format(epoch, loss))
 
     time_stamp_training = time.time() - start
     logging.info("Training: " + str(time_stamp_training))

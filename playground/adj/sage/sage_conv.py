@@ -64,7 +64,6 @@ class SAGEConv(MessagePassing):
         mw_logging.log_peak_increase("after propagate")
         out = self.lin_l(out)
         mw_logging.log_peak_increase("after linear link")
-        mw_logging.log_gpu_memory("after linear link")
 
         x_r = x[1]
         if x_r is not None:
@@ -75,6 +74,7 @@ class SAGEConv(MessagePassing):
 
         if self.normalize:
             out = F.normalize(out, p=2., dim=-1)
+            mw_logging.log_peak_increase("after normalise")
 
         return out
 
@@ -85,8 +85,8 @@ class SAGEConv(MessagePassing):
                               x: OptPairTensor) -> Tensor:
         adj_t = adj_t.set_value(None, layout=None)
         mul_adj_x = matmul(adj_t, x[0], reduce=self.aggr)
-        mw_logging.log_peak_increase("after mul_adj_x")
-        mw_logging.log_tensor(mul_adj_x, "mul_adj_x")
+        # mw_logging.log_peak_increase("after mul_adj_x")
+        # mw_logging.log_tensor(mul_adj_x, "mul_adj_x")
         return mul_adj_x
 
     def __repr__(self):
