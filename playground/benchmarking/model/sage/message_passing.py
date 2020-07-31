@@ -21,7 +21,7 @@ from torch_geometric.nn.conv.utils.typing import (sanitize, split_types_repr, pa
 from torch_geometric.nn.conv.utils.inspector import Inspector, func_header_repr, func_body_repr
 
 import logging
-import mw_logging
+from benchmarking.log import mw as mw_logging
 
 
 class MessagePassing(torch.nn.Module):

@@ -4,23 +4,35 @@ import logging
 import subprocess
 import torch
 import torch_geometric.transforms as T
-from torch_geometric.datasets import Reddit
-# from torch_geometric.nn import SAGEConv
-
-import sage
-import reddit
-from sage_conv import SAGEConv
 from torch_sparse import SparseTensor
-import mw_logging
+
+from benchmarking.model.sage import sage
+from benchmarking.dataset import reddit, flickr
+from benchmarking.log import mw as mw_logging
 
 
 def run():
-    name = "sage_reddit"
+    graph_dataset = "reddit"
+    gnn_model = "sage"
+    adj_matrix = True
+    
+    if not adj_matrix:
+        name = "{}_{}_edge_index".format(gnn_model, graph_dataset)
+    else:
+        name = "{}_{}".format(gnn_model, graph_dataset)
+    
     monitoring_gpu = subprocess.Popen(["nvidia-smi", "dmon", "-s", "umt", "-o", "T", "-f", f"{name}.smi"])
     logging.basicConfig(filename=f"{name}.log",level=logging.DEBUG)
     start = time.time()
 
-    data, num_features, num_classes = reddit.load_data(T.ToSparseTensor())
+    if adj_matrix:
+        transform = T.ToSparseTensor()
+    else:
+        transform = None
+    if graph_dataset == "flickr":
+        data, num_features, num_classes = flickr.load_data(transform)
+    elif graph_dataset == "reddit":
+        data, num_features, num_classes = reddit.load_data(transform)
 
     time_stamp_preprocessing = time.time() - start
     logging.info("Loading data: " + str(time_stamp_preprocessing))

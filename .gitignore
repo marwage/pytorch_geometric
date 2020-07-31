@@ -15,3 +15,6 @@ runs/
 
 !torch_geometric/data/
 !test/data/
+
+*.log
+*.smi

@@ -5,11 +5,12 @@ from torch import Tensor
 from torch.nn import Linear
 import torch.nn.functional as F
 from torch_sparse import SparseTensor, matmul
+
 # from torch_geometric.nn.conv import MessagePassing
-from message_passing import MessagePassing
+from .message_passing import MessagePassing
 
 import logging
-import mw_logging
+from benchmarking.log import mw as mw_logging
 
 
 class SAGEConv(MessagePassing):

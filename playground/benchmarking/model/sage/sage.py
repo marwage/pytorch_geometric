@@ -3,8 +3,8 @@ import torch
 import torch.nn.functional as F
 
 # from torch_geometric.nn import SAGEConv
-from sage_conv import SAGEConv
-import mw_logging
+from .sage_conv import SAGEConv
+from benchmarking.log import mw as mw_logging
 
 
 class SAGE(torch.nn.Module):
