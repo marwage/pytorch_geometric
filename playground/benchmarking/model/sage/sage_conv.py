@@ -62,20 +62,20 @@ class SAGEConv(MessagePassing):
 
         # propagate_type: (x: OptPairTensor)
         out = self.propagate(edge_index, x=x, size=size)
-        mw_logging.log_peak_increase("after propagate")
+        # mw_logging.log_peak_increase("after propagate")
         out = self.lin_l(out)
-        mw_logging.log_peak_increase("after linear link")
+        # mw_logging.log_peak_increase("after linear link")
 
         x_r = x[1]
         if x_r is not None:
             linear_root = self.lin_r(x_r)
-            mw_logging.log_peak_increase("after linear root")
+            # mw_logging.log_peak_increase("after linear root")
             out += linear_root
-            mw_logging.log_peak_increase("after adding link and root")
+            # mw_logging.log_peak_increase("after adding link and root")
 
         if self.normalize:
             out = F.normalize(out, p=2., dim=-1)
-            mw_logging.log_peak_increase("after normalise")
+            # mw_logging.log_peak_increase("after normalise")
 
         return out
 

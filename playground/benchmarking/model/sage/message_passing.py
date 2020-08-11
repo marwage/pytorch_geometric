@@ -248,6 +248,9 @@ class MessagePassing(torch.nn.Module):
             msg_kwargs = self.inspector.distribute('message', coll_dict)
             out = self.message(**msg_kwargs)
 
+            # mw_logging.log_peak_increase("after message")
+            # mw_logging.log_tensor(out, "out of message")
+
             # For `GNNExplainer`, we require a separate message and aggregate
             # procedure since this allows us to inject the `edge_mask` into the
             # message passing computation scheme.
@@ -263,6 +266,9 @@ class MessagePassing(torch.nn.Module):
 
             aggr_kwargs = self.inspector.distribute('aggregate', coll_dict)
             out = self.aggregate(out, **aggr_kwargs)
+
+            # mw_logging.log_peak_increase("after aggregate")
+            # mw_logging.log_tensor(out, "out of aggregate")
 
             update_kwargs = self.inspector.distribute('update', coll_dict)
             return self.update(out, **update_kwargs)

@@ -3,6 +3,7 @@ import torch
 from torch.nn import Linear
 import torch.nn.functional as F
 from benchmarking.log import mw as mw_logging
+from torch.utils.checkpoint import checkpoint
 
 class SIGN(torch.nn.Module):
     def __init__(self, k, in_channels, out_channels, hidden_channels):
@@ -25,7 +26,8 @@ class SIGN(torch.nn.Module):
         #         mw_logging.log_tensor(x_i, "x_{}".format(i))
         for i, lin in enumerate(self.lins):
             # logging.debug("---------- layer.forward ----------")
-            linear = lin(xs[i])
+            # linear = lin(xs[i])
+            linear = checkpoint(lin, xs[i])
             # mw_logging.log_peak_increase("After linear")
             # mw_logging.log_tensor(linear, "linear")
             rlu = F.relu(linear)
@@ -39,6 +41,7 @@ class SIGN(torch.nn.Module):
         # mw_logging.log_peak_increase("After concatenate xs")
         # mw_logging.log_tensor(x, "concatenate xs")
         x = self.lin(x)
+        # x = checkpoint(self.lin, x)
         # mw_logging.log_peak_increase("After lin")
         # mw_logging.log_tensor(x, "lin")
         soft = F.log_softmax(x, dim=-1)

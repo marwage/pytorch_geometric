@@ -22,41 +22,44 @@ class SAGE(torch.nn.Module):
 
 
     def forward(self, x, edge_index):
-        logging.debug("---------- SAGE.forward ----------")
-        mw_logging.log_tensor(x, "x in")
+        # logging.debug("---------- SAGE.forward ----------")
+        # mw_logging.log_tensor(x, "x in")
         for i, layer in enumerate(self.conv):
-            logging.debug("---------- layer forward ----------")
+            # logging.debug("---------- layer forward ----------")
             x = F.dropout(x, p=0.2, training=self.training)
             # mw_logging.log_tensor(x, "after dropout")
-            mw_logging.log_peak_increase("after dropout")
+            # mw_logging.log_peak_increase("after dropout")
             x = layer(x, edge_index)
             # mw_logging.log_tensor(x, "after layer")
-            mw_logging.log_peak_increase("after layer")
+            # mw_logging.log_peak_increase("after layer")
             if i != (self.num_layers - 1):
                 x = F.relu(x)
                 # mw_logging.log_tensor(x, "after relu")
-                mw_logging.log_peak_increase("after relu")
+                # mw_logging.log_peak_increase("after relu")
         softmax = F.log_softmax(x, dim=1)
         # mw_logging.log_tensor(softmax, "after softmax")
-        mw_logging.log_peak_increase("after softmax")
+        # mw_logging.log_peak_increase("after softmax")
         return softmax
 
 
 def train(data, train_mask, model, optimizer):
     model.train()
     total_loss = total_nodes = 0
-    mw_logging.log_peak_increase("Before zero_grad")
+    # mw_logging.log_peak_increase("Before zero_grad")
     optimizer.zero_grad()
-    mw_logging.log_peak_increase("After zero_grad")
-    logits = model(data.x, data.adj_t)
+    # mw_logging.log_peak_increase("After zero_grad")
+    if hasattr(data, "adj_t"):
+        logits = model(data.x, data.adj_t)
+    else:
+        logits = model(data.x, data.edge_index)
     # mw_logging.log_tensor(logits, "logits")
-    mw_logging.log_peak_increase("After forward")
+    # mw_logging.log_peak_increase("After forward")
     loss = F.nll_loss(logits[train_mask], data.y[train_mask])
-    mw_logging.log_peak_increase("After loss")
+    # mw_logging.log_peak_increase("After loss")
     loss.backward()
-    mw_logging.log_peak_increase("After backward")
+    # mw_logging.log_peak_increase("After backward")
     optimizer.step()
-    mw_logging.log_peak_increase("After step")
+    # mw_logging.log_peak_increase("After step")
 
     nodes = data.train_mask.sum().item()
     total_loss = loss.item() * nodes
@@ -66,13 +69,15 @@ def train(data, train_mask, model, optimizer):
 
 
 @torch.no_grad()
-def test(data, model):
+def test(data, model, masks):
     model.eval()
     total_correct, total_nodes = [0, 0, 0], [0, 0, 0]
-    logits = model(data.x, data.adj_t)
+    if hasattr(data, "adj_t"):
+        logits = model(data.x, data.adj_t)
+    else:
+        logits = model(data.x, data.edge_index)
     pred = logits.argmax(dim=1)
 
-    masks = [data.train_mask, data.val_mask, data.test_mask]
     for i, mask in enumerate(masks):
         total_correct[i] = (pred[mask] == data.y[mask]).sum().item()
         total_nodes[i] = mask.sum().item()

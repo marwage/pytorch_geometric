@@ -43,3 +43,10 @@ def log_sparse_storage(storage: SparseStorage, name="?"):
     log_tensor(storage._colcount, "{} colcount".format(name))
     log_tensor(storage._csr2csc, "{} csr2csc".format(name))
     log_tensor(storage._csc2csr, "{} csc2csr".format(name))
+
+def backward_hook(module, grad_input, grad_output):
+    log_peak_increase("in backward hook of {}".format(str(module)))
+    for i, grad_in in enumerate(grad_input):
+        log_tensor(grad_in, "grad_input {}".format(i))
+    for i, grad_out in enumerate(grad_output):
+        log_tensor(grad_out, "grad_output {}".format(i))
