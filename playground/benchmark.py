@@ -21,7 +21,7 @@ def run(graph_dataset, gnn_model, adj_matrix):
     
     monitoring_gpu = subprocess.Popen(["nvidia-smi", "dmon", "-s", "umt", "-o", "T", "-f", f"{name}.smi"])
     logging.basicConfig(filename=f"{name}.log",level=logging.DEBUG)
-    start = time.time()
+    mw_logging.set_start()
 
     transform_list = []
     if gnn_model == "sign":
@@ -42,9 +42,10 @@ def run(graph_dataset, gnn_model, adj_matrix):
         data, num_features, num_classes = reddit.load_data(transform)
     elif graph_dataset == "products":
         data, split_idx, num_features, num_classes = products.load_data(transform)
+    else:
+        raise Exception("Not a valid dataset")
 
-    time_stamp_preprocessing = time.time() - start
-    logging.info("Preprocessing data: " + str(time_stamp_preprocessing))
+    mw_logging.log_timestamp("preprocessing")
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -54,8 +55,7 @@ def run(graph_dataset, gnn_model, adj_matrix):
         xs = [data.x.to(device)] + [data[f'x{i}'].to(device) for i in range(1, k + 1)]
         y = data.y.to(device)
 
-    time_stamp_data = time.time() - start
-    logging.info("Copying data: " + str(time_stamp_data))
+    mw_logging.log_timestamp("copying data")
 
     # logging.debug("---------- data ----------")
     # logging.debug("Type of data: " + str(type(data)))
@@ -85,8 +85,7 @@ def run(graph_dataset, gnn_model, adj_matrix):
 
     model = model.to(device)
 
-    time_stamp_model = time.time() - start
-    logging.info("Copying model: " + str(time_stamp_model))
+    mw_logging.log_timestamp("copying model")
 
     # logging.debug("-------- model ---------")
     # logging.debug("Type of model: {}".format(type(model)))
@@ -117,8 +116,7 @@ def run(graph_dataset, gnn_model, adj_matrix):
             'Test: {:.4f}'.format(epoch, loss, *accs))
         logging.info("Epoch: {:02d}, Loss: {:.4f}".format(epoch, loss))
 
-    time_stamp_training = time.time() - start
-    logging.info("Training: " + str(time_stamp_training))
+    mw_logging.log_timestamp("finish training")
     # mw_logging.log_gpu_memory("End of training")
 
     monitoring_gpu.terminate()

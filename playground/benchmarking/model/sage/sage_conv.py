@@ -63,6 +63,8 @@ class SAGEConv(MessagePassing):
         # propagate_type: (x: OptPairTensor)
         out = self.propagate(edge_index, x=x, size=size)
         # mw_logging.log_peak_increase("after propagate")
+        mw_logging.log_timestamp("after propagate")
+        
         out = self.lin_l(out)
         # mw_logging.log_peak_increase("after linear link")
 

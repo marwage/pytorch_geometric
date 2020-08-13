@@ -22,23 +22,27 @@ class SAGE(torch.nn.Module):
 
 
     def forward(self, x, edge_index):
-        # logging.debug("---------- SAGE.forward ----------")
+        logging.debug("---------- SAGE.forward ----------")
         # mw_logging.log_tensor(x, "x in")
         for i, layer in enumerate(self.conv):
-            # logging.debug("---------- layer forward ----------")
+            logging.debug("---------- layer forward ----------")
             x = F.dropout(x, p=0.2, training=self.training)
             # mw_logging.log_tensor(x, "after dropout")
             # mw_logging.log_peak_increase("after dropout")
+            mw_logging.log_timestamp("after dropout")
             x = layer(x, edge_index)
             # mw_logging.log_tensor(x, "after layer")
             # mw_logging.log_peak_increase("after layer")
+            mw_logging.log_timestamp("after layer")
             if i != (self.num_layers - 1):
                 x = F.relu(x)
                 # mw_logging.log_tensor(x, "after relu")
                 # mw_logging.log_peak_increase("after relu")
+                mw_logging.log_timestamp("after relu")
         softmax = F.log_softmax(x, dim=1)
         # mw_logging.log_tensor(softmax, "after softmax")
         # mw_logging.log_peak_increase("after softmax")
+        mw_logging.log_timestamp("after softmax")
         return softmax
 
 
@@ -56,10 +60,13 @@ def train(data, train_mask, model, optimizer):
     # mw_logging.log_peak_increase("After forward")
     loss = F.nll_loss(logits[train_mask], data.y[train_mask])
     # mw_logging.log_peak_increase("After loss")
+    mw_logging.log_timestamp("after forward")
     loss.backward()
     # mw_logging.log_peak_increase("After backward")
+    mw_logging.log_timestamp("after backward")
     optimizer.step()
     # mw_logging.log_peak_increase("After step")
+    mw_logging.log_timestamp("after step")
 
     nodes = data.train_mask.sum().item()
     total_loss = loss.item() * nodes
