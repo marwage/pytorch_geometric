@@ -1,7 +1,7 @@
 import logging
 import time
 import torch
-from torch_sparse import SparseStorage
+from torch_sparse import SparseStorage, SparseTensor
 
 max_peak_allocated = 0
 mib = pow(2, 20)
@@ -22,9 +22,13 @@ def log_gpu_memory(when, start=0):
 
 def log_tensor(tensor, name="?"):
     if tensor is not None:
-        logging.debug("{}:shape {};data type {};pointer {};size {}".format(name, tensor.size(), tensor.dtype, tensor.storage().data_ptr(), tensor.storage().size()))
-        if tensor.grad is not None:
-            logging.debug("{}:shape {};data type {};pointer {};size {}".format(name + ".grad", tensor.grad.size(), tensor.grad.dtype, tensor.grad.storage().data_ptr(), tensor.grad.storage().size()))
+        if isinstance(tensor, SparseTensor):
+            logging.debug("{}:shape {};data type {}; device {}".format(name, tensor.sizes(), tensor.dtype(), tensor.device()))
+            log_sparse_storage(tensor.storage, name=name)
+        else:
+            logging.debug("{}:shape {};data type {};pointer {};size {}; device {}".format(name, tensor.size(), tensor.dtype, tensor.storage().data_ptr(), tensor.storage().size(), tensor.device))
+            if tensor.grad is not None:
+                logging.debug("{}:shape {};data type {};pointer {};size {}; device {}".format(name + ".grad", tensor.grad.size(), tensor.grad.dtype, tensor.grad.storage().data_ptr(), tensor.grad.storage().size(), tensor.device))
 
 
 def log_peak_increase(when:str, device=None):

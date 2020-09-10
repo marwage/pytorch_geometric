@@ -18,3 +18,4 @@ runs/
 
 *.log
 *.smi
+*.nsight-cuprof-report
