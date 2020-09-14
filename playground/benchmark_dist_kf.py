@@ -14,7 +14,10 @@ from kungfu.python import current_rank, current_cluster_size
 
 
 def run(graph_dataset):
-    name = "{}_{}_chunk_act".format("sage", graph_dataset)
+    rank = current_rank()
+    cluster_size = current_cluster_size()
+
+    name = "{}_{}_chunk_act_{}".format("sage", graph_dataset, rank)
     
     # monitoring_gpu = subprocess.Popen(["nvidia-smi", "dmon", "-s", "umt", "-o", "T", "-f", f"{name}.smi"])
     logging.basicConfig(filename=f"{name}.log",level=logging.DEBUG)
@@ -39,8 +42,6 @@ def run(graph_dataset):
     else:
         raise Exception("Not a valid dataset")
 
-    rank = current_rank()
-    cluster_size = current_cluster_size()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     num_hidden_channels = 512
@@ -63,8 +64,11 @@ def run(graph_dataset):
         masks = [data.train_mask, data.val_mask, data.test_mask]
         train_mask = data.train_mask
 
-    x_chunk = data.x.chunk(cluster_size)[rank]
+    x_chunks = data.x.chunk(cluster_size)
+    x_chunk = x_chunks[rank]
     x = x_chunk.to(device)
+    default_chunk_size = x_chunks[0].size(0)
+    chunk_sizes_diff = x_chunks[0].size(0) - x_chunks[cluster_size - 1].size(0)
     y = data.y.to(device)
     adj = data.adj_t
     chunk_size = x_chunk.size(0)
@@ -79,7 +83,7 @@ def run(graph_dataset):
 
     num_epochs = 1
     for epoch in range(1, num_epochs + 1):
-        loss = sage.train(x, adj, y, train_mask, model, optimizer)
+        loss = sage.train(x, adj, y, train_mask, model, optimizer, default_chunk_size, chunk_sizes_diff)
         # accs = sage.test(x, adj, y, model, masks)
         # logging.info('Epoch: {:02d}, Loss: {:.4f}, Train: {:.4f}, Val: {:.4f}, '
         #     'Test: {:.4f}'.format(epoch, loss, *accs))
