@@ -6,6 +6,8 @@ from torch_geometric.nn import SAGEConv
 from benchmarking.log import mw as mw_logging
 from torch_sparse import matmul
 
+from kungfu.torch.ops import all_gather
+
 
 class SAGE(torch.nn.Module):
     def __init__(self, num_hidden_layers, in_channels, out_channels, hidden_channels):
@@ -21,47 +23,40 @@ class SAGE(torch.nn.Module):
             self.conv.append(SAGEConv(hidden_channels, out_channels, normalize=False))
 
 
-    def forward(self, xs, adjs):
+    def forward(self, x, adj):
         dropout_prob = 0.2
-        num_gpus = torch.cuda.device_count()
-        devices = ["cuda:{}".format(i) for i in range(num_gpus)]
 
-        acts = xs
+        act = x
         for i, layer in enumerate(self.conv):
-            for j, gpu in enumerate(devices):
-                acts_dropout = F.dropout(acts[j], p=dropout_prob, training=self.training)
-                acts[j] = acts_dropout
+            act_dropout = F.dropout(act, p=dropout_prob, training=self.training)
                 
-            for j, gpu in enumerate(devices):
-                acts_local = [act.to(gpu) for act in acts]
+            act_dropout_all = all_gather(act_dropout)
 
-                act_matmul = matmul(adjs[j], torch.cat(acts_local), reduce="mean")
-                layer.lin_l = layer.lin_l.to(gpu)
-                act_layer_l = layer.lin_l(act_matmul)
-                layer.lin_r = layer.lin_r.to(gpu)
-                act_layer_r = layer.lin_r(acts[j])
-                act_layer = act_layer_l + act_layer_r
-                
-                if i != (self.num_layers - 1):
-                    act_relu = F.relu(act_layer)
-                else:
-                    act_relu = act_layer
+            act_matmul = matmul(adj, act_dropout_all, reduce="mean")
+            act_layer_l = layer.lin_l(act_matmul)
+            act_layer_r = layer.lin_r(act_dropout)
+            act_layer = act_layer_l + act_layer_r
+            
+            if i != (self.num_layers - 1):
+                act_relu = F.relu(act_layer)
+            else:
+                act_relu = act_layer
 
-                acts[j] = act_relu
+            act = act_relu
 
-        acts = [act.to("cuda:0") for act in acts]
-        softmax = F.log_softmax(torch.cat(acts), dim=1)
+        act_all = all_gather(act)
+        softmax = F.log_softmax(act_all, dim=1)
 
         return softmax
 
 
-def train(xs, adjs, y, train_mask, model, optimizer):
+def train(x, adj, y, train_mask, model, optimizer):
     model.train()
     total_loss = total_nodes = 0
     optimizer.zero_grad()
-    logits = model(xs, adjs)
+    logits = model(x, adj)
     loss = F.nll_loss(logits[train_mask], y[train_mask])
-    # loss.backward()
+    # loss.backward() # TODO RuntimeError: element 0 of tensors does not require grad and does not have a grad_fn
     # optimizer.step()
 
     nodes = train_mask.sum().item()

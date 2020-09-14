@@ -41,7 +41,7 @@ def run(graph_dataset):
 
     rank = current_rank()
     cluster_size = current_cluster_size()
-    device = "cuda:{}".format(rank)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     num_hidden_channels = 512
     num_hidden_layers = 2
@@ -65,11 +65,10 @@ def run(graph_dataset):
 
     x_chunk = data.x.chunk(cluster_size)[rank]
     x = x_chunk.to(device)
-    y_chunk = data.y.chunk(cluster_size)[rank]
-    y = y_chunk.to(device)
+    y = data.y.to(device)
     adj = data.adj_t
     chunk_size = x_chunk.size(0)
-    l = gpu * chunk_size
+    l = rank * chunk_size
     if l + chunk_size <= adj.size(0):
         u = l + chunk_size
     else:
@@ -80,7 +79,7 @@ def run(graph_dataset):
 
     num_epochs = 1
     for epoch in range(1, num_epochs + 1):
-        loss = sage.train(xs, adjs, y, train_mask, model, optimizer)
+        loss = sage.train(x, adj, y, train_mask, model, optimizer)
         # accs = sage.test(x, adj, y, model, masks)
         # logging.info('Epoch: {:02d}, Loss: {:.4f}, Train: {:.4f}, Val: {:.4f}, '
         #     'Test: {:.4f}'.format(epoch, loss, *accs))
