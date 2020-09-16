@@ -19,11 +19,9 @@ def run(graph_dataset):
 
     name = "{}_{}_chunk_act_{}".format("sage", graph_dataset, rank)
     
-    # monitoring_gpu = subprocess.Popen(["nvidia-smi", "dmon", "-s", "umt", "-o", "T", "-f", f"{name}.smi"])
+    monitoring_gpu = subprocess.Popen(["nvidia-smi", "dmon", "-s", "umt", "-o", "T", "-f", f"{name}.smi"])
     logging.basicConfig(filename=f"{name}.log",level=logging.DEBUG)
     mw_logging.set_start()
-
-    torch.autograd.set_detect_anomaly(True)
 
     transform_list = []
     transform_list.append(T.ToSparseTensor())
@@ -44,7 +42,7 @@ def run(graph_dataset):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    num_hidden_channels = 512
+    num_hidden_channels = 128 # ATTENTION default was 512
     num_hidden_layers = 2
     model = sage.SAGE(num_hidden_layers, num_features, num_classes, num_hidden_channels)
 
@@ -69,7 +67,7 @@ def run(graph_dataset):
     x = x_chunk.to(device)
     default_chunk_size = x_chunks[0].size(0)
     chunk_sizes_diff = x_chunks[0].size(0) - x_chunks[cluster_size - 1].size(0)
-    y = data.y.to(device)
+    y = data.y.squeeze().to(device)
     adj = data.adj_t
     chunk_size = x_chunk.size(0)
     l = rank * chunk_size
@@ -79,20 +77,20 @@ def run(graph_dataset):
         u = adj.size(0)
     adj_chunk = adj[l:u]
     adj = adj_chunk.to(device)
-    train_mask = train_mask.to(device) # train_mask is not split if all workers calculate the softmax and loss
+    masks = [mask.to(device) for mask in masks]
+    train_mask = masks[0] # train_mask is not split if all workers calculate the softmax and loss
 
-    num_epochs = 1
+    num_epochs = 30
     for epoch in range(1, num_epochs + 1):
         loss = sage.train(x, adj, y, train_mask, model, optimizer, default_chunk_size, chunk_sizes_diff)
-        # accs = sage.test(x, adj, y, model, masks)
-        # logging.info('Epoch: {:02d}, Loss: {:.4f}, Train: {:.4f}, Val: {:.4f}, '
-        #     'Test: {:.4f}'.format(epoch, loss, *accs))
-        logging.info("Epoch: {:02d}, Loss: {:.4f}".format(epoch, loss))
+        accs = sage.test(x, adj, y, model, masks, default_chunk_size, chunk_sizes_diff)
+        logging.info('Epoch: {:02d}, Loss: {:.4f}, Train: {:.4f}, Val: {:.4f}, '
+            'Test: {:.4f}'.format(epoch, loss, *accs))
 
     mw_logging.log_timestamp("End of training")
     mw_logging.log_gpu_memory("End of training")
 
-    # monitoring_gpu.terminate()
+    monitoring_gpu.terminate()
 
 
 if __name__ == "__main__":
