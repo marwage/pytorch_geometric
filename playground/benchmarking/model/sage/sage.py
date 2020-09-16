@@ -86,7 +86,10 @@ def test(data, model, masks):
     pred = logits.argmax(dim=1)
 
     for i, mask in enumerate(masks):
-        total_correct[i] = (pred[mask] == data.y[mask]).sum().item()
-        total_nodes[i] = mask.sum().item()
+        total_correct[i] = (pred[mask] == y[mask]).sum().item()
+        if mask.dtype == torch.bool:
+            total_nodes[i] = mask.sum().item()
+        else:
+            total_nodes[i] = mask.size(0)
 
     return (torch.Tensor(total_correct) / torch.Tensor(total_nodes)).tolist()

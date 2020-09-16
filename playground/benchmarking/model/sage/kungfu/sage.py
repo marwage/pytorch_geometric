@@ -106,6 +106,9 @@ def test(x, adj, y, model, masks, default_chunk_size, chunk_sizes_diff):
 
     for i, mask in enumerate(masks):
         total_correct[i] = (pred[mask] == y[mask]).sum().item()
-        total_nodes[i] = mask.sum().item()
+        if mask.dtype == torch.bool:
+            total_nodes[i] = mask.sum().item()
+        else:
+            total_nodes[i] = mask.size(0)
 
     return (torch.Tensor(total_correct) / torch.Tensor(total_nodes)).tolist()
