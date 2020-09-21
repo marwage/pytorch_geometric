@@ -46,6 +46,8 @@ def run(graph_dataset):
     num_hidden_layers = 2
     model = sage.SAGE(num_hidden_layers, num_features, num_classes, num_hidden_channels)
 
+    # TODO sync model parameters
+
     model.to(device)
 
     learning_rate = 0.01

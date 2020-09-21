@@ -88,6 +88,7 @@ def train(x, adj, y, train_mask, model, optimizer, default_chunk_size, chunk_siz
     logits = model(x, adj, default_chunk_size, chunk_sizes_diff)
     loss = F.nll_loss(logits[train_mask], y[train_mask])
     loss.backward()
+    # TODO sync gradients
     optimizer.step()
 
     nodes = train_mask.sum().item()
