@@ -5,12 +5,13 @@ from torch_sparse import SparseStorage, SparseTensor
 
 max_peak_allocated = 0
 mib = pow(2, 20)
-
 start = 0
+last_current_active = 0
+last_current_active_byte = 0
 
 
-def log_gpu_memory(when, start=0):
-    mib = pow(2, 20)
+def log_gpu_memory(when):
+    global start
     if start == 0:
         since_start = 0
     else:
@@ -31,15 +32,15 @@ def log_tensor(tensor, name="?"):
                 logging.debug("{}:shape {};data type {};pointer {};size {}; device {}".format(name + ".grad", tensor.grad.size(), tensor.grad.dtype, tensor.grad.storage().data_ptr(), tensor.grad.storage().size(), tensor.device))
 
 
-def log_peak_increase(when:str, device=None):
+def log_peak_increase(where:str, device=None):
     global max_peak_allocated
     max_allocated = torch.cuda.max_memory_allocated(device=device)
     if max_allocated > max_peak_allocated:
         increase = (max_allocated - max_peak_allocated) / mib
-        logging.debug("{}:increase of allocated_bytes.all.peak {:.2f}MiB".format(when, increase))
+        logging.debug("{}:increase of allocated_bytes.all.peak {:.2f}MiB".format(where, increase))
         max_peak_allocated = max_allocated
     else:
-        logging.debug("{}:No increase of allocated_bytes.all.peak".format(when))
+        logging.debug("{}:No increase of allocated_bytes.all.peak".format(where))
 
 
 def log_sparse_storage(storage: SparseStorage, name="?"):
@@ -71,3 +72,16 @@ def log_timestamp(when: str):
     global start
     now = time.time() - start
     logging.debug("Timestamp {}: {:.6f}".format(when, now))
+
+def log_current_active(where:str="?"):
+    global last_current_active
+    global last_current_active_byte
+    stats = torch.cuda.memory_stats()
+    current_active_byte =  stats["active_bytes.all.current"]
+    current_active = current_active_byte / mib
+    diff = current_active - last_current_active
+    diff_byte = current_active_byte- last_current_active_byte
+    logging.debug("{}:GPU.active.current {:.2f}MiB, diff {:.2f}MiB".format(where, current_active, diff))
+    logging.debug("{}:GPU.active.current {}B, diff {}B".format(where, current_active_byte, diff_byte))
+    last_current_active = current_active
+    last_current_active_byte = current_active_byte

@@ -23,78 +23,80 @@ class SAGE(torch.nn.Module):
 
 
     def forward(self, x_chunks, adj_chunks, y_chunks, train_mask_chunks):
-        empty_cache = False
         dropout_prob = 0.2
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         loss = torch.zeros((1,), device=device)
-
         num_chunks = len(x_chunks)
-        dropout_chunks = []
 
         # compute dropout for each chunk
-        for x_chunk in x_chunks:
+        dropout_chunks = []
+        for i, x_chunk in enumerate(x_chunks):
             x_chunk = x_chunk.to(device)
             dropout_chunk = F.dropout(x_chunk, p=dropout_prob, training=self.training)
+            del x_chunk
             dropout_chunk = dropout_chunk.cpu()
-            if empty_cache: torch.cuda.empty_cache()
             dropout_chunks.append(dropout_chunk)
         
         for i, layer in enumerate(self.conv):
             # load input for aggregation
-            dropout = torch.cat(dropout_chunks)
-            dropout = dropout.to(device)            
+            dropout_mat = torch.cat(dropout_chunks)
+            dropout_mat = dropout_mat.to(device)   
 
             # aggreate neighbourhood features
             aggr_chunks = []
-            for adj_chunk in adj_chunks:
+            for j, adj_chunk in enumerate(adj_chunks):
                 adj_chunk = adj_chunk.to(device)
-                aggr_chunk = matmul(adj_chunk, dropout, reduce="mean")
+                aggr_chunk = matmul(adj_chunk, dropout_mat, reduce="mean")
+                del adj_chunk
                 aggr_chunk = aggr_chunk.cpu()
-                if empty_cache: torch.cuda.empty_cache()
                 aggr_chunks.append(aggr_chunk)
-            dropout = dropout.cpu()
-            if empty_cache: torch.cuda.empty_cache()
+            del dropout_mat
 
-            # apply linear and (ReLU or (softmax and loss))
-            new_dropout_chunks = []
+            # apply linear and ((ReLU and dropout) or (softmax and loss))
             for j, (aggr_chunk, dropout_chunk) in enumerate(zip(aggr_chunks, dropout_chunks)):
                 # apply linear
-                aggr_chunk = aggr_chunk.to(device)
-                dropout_chunk = dropout_chunk.to(device)
-                linear_neighbours = layer.lin_l(aggr_chunk)
-                aggr_chunk = aggr_chunk.cpu()
-                if empty_cache: torch.cuda.empty_cache()
-                linear_self = layer.lin_r(dropout_chunk)
-                dropout_chunk = dropout_chunk.cpu()
-                if empty_cache: torch.cuda.empty_cache()
+                aggr_chunk_gpu = aggr_chunk.to(device)
+                dropout_chunk_gpu = dropout_chunk.to(device)
+                linear_neighbours = layer.lin_l(aggr_chunk_gpu)
+                mw_logging.log_current_active("Before delete aggr_chunk_gpu {}-{}".format(i, j))
+                del aggr_chunk_gpu # TODO no decrease
+                mw_logging.log_current_active("After delete aggr_chunk_gpu {}-{}".format(i, j))
+                linear_self = layer.lin_r(dropout_chunk_gpu)
+                mw_logging.log_current_active("Before delete dropout_chunk_gpu {}-{}".format(i, j))
+                del dropout_chunk_gpu # TODO no decrease
+                mw_logging.log_current_active("After delete dropout_chunk_gpu {}-{}".format(i, j))
                 linear = linear_neighbours + linear_self
                 linear_neighbours = linear_neighbours.cpu()
                 linear_self = linear_self.cpu()
-                if empty_cache: torch.cuda.empty_cache()
 
-                # apply (ReLU or (softmax and loss))
-                if i != (self.num_layers - 1):
+                # apply ((ReLU and dropout) or (softmax and loss))
+                if i != (self.num_layers - 1): # (ReLU and dropout)
                     relu_chunk = F.relu(linear)
-                    linear = linear.cpu()
-                    if empty_cache: torch.cuda.empty_cache()
+                    mw_logging.log_current_active("Before linear to CPU {}-{}".format(i, j))
+                    linear = linear.cpu() # TODO no decrease
+                    mw_logging.log_current_active("After linear to CPU {}-{}".format(i, j))
+
                     dropout_chunk = F.dropout(relu_chunk, p=dropout_prob, training=self.training)
                     relu_chunk = relu_chunk.cpu()
                     dropout_chunk = dropout_chunk.cpu()
-                    if empty_cache: torch.cuda.empty_cache()
-                    new_dropout_chunks.append(dropout_chunk)
-                    if j == (num_chunks - 1):
-                        dropout_chunks = new_dropout_chunks
+                    dropout_chunks[j] = dropout_chunk
+
                 else: # softmax and loss
                     softmax_chunk = F.log_softmax(linear, dim=1)
-                    linear = linear.cpu()
-                    if empty_cache: torch.cuda.empty_cache()
+                    mw_logging.log_current_active("Before linear to CPU {}-{}".format(i, j))
+                    linear = linear.cpu() # TODO no decrease
+                    mw_logging.log_current_active("After linear to CPU {}-{}".format(i, j))
                     y_chunk = y_chunks[j].to(device)
                     train_mask_chunk = train_mask_chunks[j].to(device)
                     loss += F.nll_loss(softmax_chunk[train_mask_chunk], y_chunk[train_mask_chunk])
-                    softmax_chunk = softmax_chunk.cpu()
-                    y_chunk = y_chunk.cpu()
-                    train_mask_chunk = train_mask_chunk.cpu() 
-                    if empty_cache: torch.cuda.empty_cache()
+                    mw_logging.log_current_active("Before softmax_chunk to CPU {}-{}".format(i, j))
+                    softmax_chunk = softmax_chunk.cpu() # TODO no decrease; small could be neglected
+                    mw_logging.log_current_active("After softmax_chunk to CPU {}-{}".format(i, j))
+                    del y_chunk
+                    mw_logging.log_current_active("Before delete train_mask_chunk {}-{}".format(i, j))
+                    del train_mask_chunk # TODO no decrease; small could be neglected
+                    mw_logging.log_current_active("After delete train_mask_chunk {}-{}".format(i, j))
+
         return loss / num_chunks
 
 
@@ -103,6 +105,7 @@ def train(x, adj, y, train_mask, model, optimizer):
     optimizer.zero_grad()
     loss = model(x, adj, y, train_mask)
     loss.backward()
+    mw_logging.log_current_active("Backward")
     optimizer.step()
 
     return loss.item()

@@ -12,7 +12,8 @@ from benchmarking.log import mw as mw_logging
 
 
 def run(graph_dataset):
-    name = "{}_{}_chunk".format("sage", graph_dataset)
+    chunk_size = 2 ** 14
+    name = "{}_{}_chunk_{}".format("sage", graph_dataset, chunk_size)
     
     monitoring_gpu = subprocess.Popen(["nvidia-smi", "dmon", "-s", "umt", "-o", "T", "-f", f"{name}.smi"])
     logging.basicConfig(filename=f"{name}.log",level=logging.DEBUG)
@@ -67,7 +68,6 @@ def run(graph_dataset):
         mask[train_mask] = 1
         train_mask = mask
 
-    chunk_size = 2 ** 14
     N = x.size(0)
     x_chunks = x.split(chunk_size)
     y_chunks = y.split(chunk_size)
@@ -81,7 +81,7 @@ def run(graph_dataset):
             u = N
         adj_chunks.append(adj[l:u])
 
-    num_epochs = 30
+    num_epochs = 5
     for epoch in range(1, num_epochs + 1):
         loss = sage.train(x_chunks, adj_chunks, y_chunks, train_mask_chunks, model, optimizer)
         # accs = sage.test(x, adj, y, model, masks)
