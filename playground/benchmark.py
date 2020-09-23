@@ -44,8 +44,6 @@ def run(graph_dataset, gnn_model, adj_matrix):
     else:
         raise Exception("Not a valid dataset")
 
-    # mw_logging.log_timestamp("preprocessing")
-
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     if gnn_model == "sage":
@@ -54,28 +52,10 @@ def run(graph_dataset, gnn_model, adj_matrix):
         xs = [data.x.to(device)] + [data[f'x{i}'].to(device) for i in range(1, k + 1)]
         y = data.y.to(device)
 
-    # mw_logging.log_timestamp("copying data")
-
-    # logging.debug("---------- data ----------")
-    # logging.debug("Type of data: " + str(type(data)))
-    # logging.debug("Number of classes {}".format(num_classes))
-    # logging.debug("Number of edges {}".format(data.num_edges))
-    # for attribute in dir(data):
-    #     if type(data[attribute]) is torch.Tensor:
-    #         mw_logging.log_tensor(data[attribute], attribute)
-    #     if type(data[attribute]) is SparseTensor:
-    #         storage = data[attribute].storage
-    #         mw_logging.log_sparse_storage(storage, attribute)
-            
-    # mw_logging.log_peak_increase("After data.to(device)")
-
     num_hidden_channels = 512
     if gnn_model == "sage":
         num_hidden_layers = 2
         model = sage.SAGE(num_hidden_layers, num_features, num_classes, num_hidden_channels)
-        # for submodule in model.modules():
-        #     # if isinstance(submodule, torch.nn.Linear):
-        #     submodule.register_backward_hook(mw_logging.backward_hook)
     elif gnn_model == "sign":
         model = sign.SIGN(k, num_features, num_classes, num_hidden_channels)
 
@@ -84,17 +64,6 @@ def run(graph_dataset, gnn_model, adj_matrix):
 
     model = model.to(device)
 
-    # mw_logging.log_timestamp("copying model")
-
-    # logging.debug("-------- model ---------")
-    # logging.debug("Type of model: {}".format(type(model)))
-    # for i, param in enumerate(model.parameters()):
-    #     mw_logging.log_tensor(param, "param {}".format(i))
-    # mw_logging.log_peak_increase("After model.to(device)")
-
-    # logging.debug("Type of optimizer: {}".format(type(optimizer)))
-    # logging.debug("Attributes of optimizer: {}".format(dir(optimizer)))
-
     if graph_dataset == "products":
         masks = [split_idx["train"], split_idx["valid"], split_idx["test"]]
         train_mask = split_idx["train"]
@@ -102,16 +71,16 @@ def run(graph_dataset, gnn_model, adj_matrix):
         masks = [data.train_mask, data.val_mask, data.test_mask]
         train_mask = data.train_mask
 
-    num_epochs = 1
+    num_epochs = 30
     for epoch in range(1, num_epochs + 1):
         if gnn_model == "sage":
             loss = sage.train(data, train_mask, model, optimizer)
-            accs = sage.test(data, model, masks)
+            # accs = sage.test(data, model, masks)
         elif gnn_model == "sign":
             loss = sign.train(xs, y, train_mask, model, optimizer)
             accs = sign.test(xs, y, masks, model)
-        logging.info('Epoch: {:02d}, Loss: {:.4f}, Train: {:.4f}, Val: {:.4f}, '
-            'Test: {:.4f}'.format(epoch, loss, *accs))
+        # logging.info('Epoch: {:02d}, Loss: {:.4f}, Train: {:.4f}, Val: {:.4f}, '
+        #     'Test: {:.4f}'.format(epoch, loss, *accs))
         logging.info("Epoch: {:02d}, Loss: {:.4f}".format(epoch, loss))
 
     mw_logging.log_timestamp("finish training")

@@ -83,7 +83,6 @@ class SAGE(torch.nn.Module):
 
 def train(x, adj, y, train_mask, model, optimizer, default_chunk_size, chunk_sizes_diff):
     model.train()
-    total_loss = total_nodes = 0
     optimizer.zero_grad()
     logits = model(x, adj, default_chunk_size, chunk_sizes_diff)
     loss = F.nll_loss(logits[train_mask], y[train_mask])
@@ -91,11 +90,7 @@ def train(x, adj, y, train_mask, model, optimizer, default_chunk_size, chunk_siz
     # TODO sync gradients
     optimizer.step()
 
-    nodes = train_mask.sum().item()
-    total_loss = loss.item() * nodes
-    total_nodes = nodes
-
-    return total_loss / total_nodes
+    return loss.item()
 
 
 @torch.no_grad()

@@ -22,147 +22,90 @@ class SAGE(torch.nn.Module):
             self.conv.append(SAGEConv(hidden_channels, out_channels, normalize=False))
 
 
-    def forward(self, x, adj):
+    def forward(self, x_chunks, adj_chunks, y_chunks, train_mask_chunks):
+        empty_cache = False
         dropout_prob = 0.2
-        chunk_size = 2 ** 11
-        keep_all_tensors = False
-        log_tensors = False
-        log_memory = False
-        swap_to_cpu = True
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        loss = torch.zeros((1,), device=device)
 
-        if keep_all_tensors: all_tensors = []
-        if keep_all_tensors: all_tensors.append(("x", x))
-        if keep_all_tensors: all_tensors.append(("adj", adj))
+        num_chunks = len(x_chunks)
+        dropout_chunks = []
 
-        a = x
-        if log_tensors: mw_logging.log_tensor(a, "x")
-        if log_memory: mw_logging.log_gpu_memory("x")
+        # compute dropout for each chunk
+        for x_chunk in x_chunks:
+            x_chunk = x_chunk.to(device)
+            dropout_chunk = F.dropout(x_chunk, p=dropout_prob, training=self.training)
+            dropout_chunk = dropout_chunk.cpu()
+            if empty_cache: torch.cuda.empty_cache()
+            dropout_chunks.append(dropout_chunk)
+        
         for i, layer in enumerate(self.conv):
-            a = a.to(device)
-            if log_tensors: mw_logging.log_tensor(a, "a_{}".format(i))
-            if log_memory: mw_logging.log_gpu_memory("a_{}".format(i))
-            if keep_all_tensors: all_tensors.append(("a_{}".format(i), a))
-            a_dropout = F.dropout(a, p=dropout_prob, training=self.training)
-            if log_tensors: mw_logging.log_tensor(a_dropout, "a_dropout_{}".format(i))
-            if log_memory: mw_logging.log_gpu_memory("a_dropout_{}".format(i))
-            if keep_all_tensors: all_tensors.append(("a_dropout_{}".format(i), a))
-            if swap_to_cpu:
-                a_cpu = a.cpu()
-                if log_tensors: mw_logging.log_tensor(a_cpu, "a_cpu_{}".format(i))
-                if log_memory: mw_logging.log_gpu_memory("a_cpu_{}".format(i))
-                if keep_all_tensors: all_tensors.append(("a_cpu_{}".format(i), a_cpu))
+            # load input for aggregation
+            dropout = torch.cat(dropout_chunks)
+            dropout = dropout.to(device)            
 
-            relus = []
-            a_chunks = torch.split(a_dropout, chunk_size)
-            if log_tensors: [mw_logging.log_tensor(chunk, "a_chunk_{}_{}".format(i, j)) for j, chunk in enumerate(a_chunks)]
-            if log_memory: mw_logging.log_gpu_memory("a_chunks_{}".format(i))
-            # adj_chunks = torch.split(adj, chunk_size) # SparseTensor has no attribute split
-            for chunk in range(len(a_chunks)):
-                if keep_all_tensors: all_tensors.append(("a_chunk_{}_{}".format(i, chunk), a_chunks[chunk]))
-                l = chunk * chunk_size
-                if l + chunk_size <= adj.size(0):
-                    u = l + chunk_size
-                else:
-                    u = adj.size(0)
-                adj_chunk = adj[l:u]
+            # aggreate neighbourhood features
+            aggr_chunks = []
+            for adj_chunk in adj_chunks:
+                adj_chunk = adj_chunk.to(device)
+                aggr_chunk = matmul(adj_chunk, dropout, reduce="mean")
+                aggr_chunk = aggr_chunk.cpu()
+                if empty_cache: torch.cuda.empty_cache()
+                aggr_chunks.append(aggr_chunk)
+            dropout = dropout.cpu()
+            if empty_cache: torch.cuda.empty_cache()
 
-                a_matmul = matmul(adj_chunk, a_dropout, reduce="mean")
-                if log_tensors: mw_logging.log_tensor(a_matmul, "a_matmul_{}_{}".format(i, chunk))
-                if log_memory: mw_logging.log_gpu_memory("a_matmul_{}_{}".format(i, chunk))
-                if keep_all_tensors: all_tensors.append(("a_matmul_{}_{}".format(i, chunk), a_matmul))
-                a_l = layer.lin_l(a_matmul)
-                if log_tensors: mw_logging.log_tensor(a_l, "a_l_{}_{}".format(i, chunk))
-                if log_memory: mw_logging.log_gpu_memory("a_l_{}_{}".format(i, chunk))
-                if keep_all_tensors: all_tensors.append(("a_l_{}_{}".format(i, chunk), a_l))
-                a_matmul_cpu = a_matmul.cpu()
-                if log_tensors: mw_logging.log_tensor(a_matmul_cpu, "a_matmul_cpu_{}_{}".format(i, chunk))
-                if log_memory: mw_logging.log_gpu_memory("a_matmul_cpu_{}_{}".format(i, chunk))
-                if keep_all_tensors: all_tensors.append(("a_matmul_cpu_{}_{}".format(i, chunk), a_matmul_cpu))
-                a_r = layer.lin_r(a_chunks[chunk])
-                if log_tensors: mw_logging.log_tensor(a_r, "a_r_{}_{}".format(i, chunk))
-                if log_memory: mw_logging.log_gpu_memory("a_r_{}_{}".format(i, chunk))
-                if keep_all_tensors: all_tensors.append(("a_r_{}_{}".format(i, chunk), a_r))
-                a_layer = a_l + a_r
-                if log_tensors: mw_logging.log_tensor(a_layer, "a_layer_{}_{}".format(i, chunk))
-                if log_memory: mw_logging.log_gpu_memory("a_layer_{}_{}".format(i, chunk))
-                if keep_all_tensors: all_tensors.append(("a_layer_{}_{}".format(i, chunk), a_layer))
-                a_l_cpu = a_l.cpu()
-                if log_tensors: mw_logging.log_tensor(a_l_cpu, "a_l_cpu_{}_{}".format(i, chunk))
-                if log_memory: mw_logging.log_gpu_memory("a_l_cpu_{}_{}".format(i, chunk))
-                if keep_all_tensors: all_tensors.append(("a_l_cpu_{}_{}".format(i, chunk), a_l_cpu))
-                a_r_cpu = a_r.cpu()
-                if log_tensors: mw_logging.log_tensor(a_r_cpu, "a_r_cpu_{}_{}".format(i, chunk))
-                if log_memory: mw_logging.log_gpu_memory("a_r_cpu_{}_{}".format(i, chunk))
-                if keep_all_tensors: all_tensors.append(("a_r_cpu_{}_{}".format(i, chunk), a_r_cpu))
+            # apply linear and (ReLU or (softmax and loss))
+            new_dropout_chunks = []
+            for j, (aggr_chunk, dropout_chunk) in enumerate(zip(aggr_chunks, dropout_chunks)):
+                # apply linear
+                aggr_chunk = aggr_chunk.to(device)
+                dropout_chunk = dropout_chunk.to(device)
+                linear_neighbours = layer.lin_l(aggr_chunk)
+                aggr_chunk = aggr_chunk.cpu()
+                if empty_cache: torch.cuda.empty_cache()
+                linear_self = layer.lin_r(dropout_chunk)
+                dropout_chunk = dropout_chunk.cpu()
+                if empty_cache: torch.cuda.empty_cache()
+                linear = linear_neighbours + linear_self
+                linear_neighbours = linear_neighbours.cpu()
+                linear_self = linear_self.cpu()
+                if empty_cache: torch.cuda.empty_cache()
 
-                if log_tensors: mw_logging.log_tensor(a_layer, "a_layer_{}_{}".format(i, chunk))
-                if log_memory: mw_logging.log_gpu_memory("a_layer_{}_{}".format(i, chunk))
-                if keep_all_tensors: all_tensors.append(("a_layer_{}_{}".format(i, chunk), a_layer))
+                # apply (ReLU or (softmax and loss))
                 if i != (self.num_layers - 1):
-                    a_relu = F.relu(a_layer)
-                    if log_tensors: mw_logging.log_tensor(a_relu, "a_relu_{}_{}".format(i, chunk))
-                    if log_memory: mw_logging.log_gpu_memory("a_relu_{}_{}".format(i, chunk))
-                    if keep_all_tensors: all_tensors.append(("a_relu_{}_{}".format(i, chunk), a_relu))
-                    if swap_to_cpu:
-                        a_layer_cpu = a_layer.cpu()
-                        if log_tensors: mw_logging.log_tensor(a_layer_cpu, "a_layer_cpu_{}_{}".format(i, chunk))
-                        if log_memory: mw_logging.log_gpu_memory("a_layer_cpu_{}_{}".format(i, chunk))
-                        if keep_all_tensors: all_tensors.append(("a_layer_cpu_{}_{}".format(i, chunk), a_layer_cpu))
-                else:
-                    a_relu = a_layer
-                if swap_to_cpu:
-                    a_relu_cpu = a_relu.cpu()
-                    if log_tensors: mw_logging.log_tensor(a_relu_cpu, "a_relu_cpu_{}_{}".format(i, chunk))
-                    if log_memory: mw_logging.log_gpu_memory("a_relu_cpu_{}_{}".format(i, chunk))
-                    if keep_all_tensors: all_tensors.append(("a_relu_cpu_{}_{}".format(i, chunk), a_relu_cpu))
-                    relus.append(a_relu_cpu)
-                else:
-                    relus.append(a_relu)
-            if swap_to_cpu:
-                a_dropout_cpu = a_dropout.cpu()
-                if log_tensors: mw_logging.log_tensor(a_dropout_cpu, "a_dropout_cpu_{}_{}".format(i, chunk))
-                if log_memory: mw_logging.log_gpu_memory("a_dropout_cpu_{}_{}".format(i, chunk))
-                if keep_all_tensors: all_tensors.append(("a_dropout_cpu_{}_{}".format(i, chunk), a_dropout_cpu))
-            a = torch.cat(relus)
-            if log_tensors: mw_logging.log_tensor(a, "a_cat_{}_{}".format(i, chunk))
-            if log_memory: mw_logging.log_gpu_memory("a_cat_{}_{}".format(i, chunk))
-            if keep_all_tensors: all_tensors.append(("a_cat_{}_{}".format(i, chunk), a))
-
-        a = a.to(device)
-        if log_tensors: mw_logging.log_tensor(a, "a_before_softmax")
-        if log_memory: mw_logging.log_gpu_memory("a_before_softmax")
-        if keep_all_tensors: all_tensors.append(("a_before_softmax", a))
-        softmax = F.log_softmax(a, dim=1)
-        if log_tensors: mw_logging.log_tensor(softmax, "softmax")
-        if log_memory: mw_logging.log_gpu_memory("softmax")
-        if keep_all_tensors: all_tensors.append(("softmax", softmax))
-        if swap_to_cpu:
-            a_cpu = a.cpu()
-            if log_tensors: mw_logging.log_tensor(a_cpu, "a_cpu_after_softmax")
-            if log_memory: mw_logging.log_gpu_memory("a_cpu_after_softmax")
-            if keep_all_tensors: all_tensors.append(("a_cpu_after_softmax", softmax))
-
-        if keep_all_tensors: logging.debug("------ all tensors ------")
-        if keep_all_tensors: [mw_logging.log_tensor(tensor, name) for name, tensor in all_tensors]
-
-        return softmax
+                    relu_chunk = F.relu(linear)
+                    linear = linear.cpu()
+                    if empty_cache: torch.cuda.empty_cache()
+                    dropout_chunk = F.dropout(relu_chunk, p=dropout_prob, training=self.training)
+                    relu_chunk = relu_chunk.cpu()
+                    dropout_chunk = dropout_chunk.cpu()
+                    if empty_cache: torch.cuda.empty_cache()
+                    new_dropout_chunks.append(dropout_chunk)
+                    if j == (num_chunks - 1):
+                        dropout_chunks = new_dropout_chunks
+                else: # softmax and loss
+                    softmax_chunk = F.log_softmax(linear, dim=1)
+                    linear = linear.cpu()
+                    if empty_cache: torch.cuda.empty_cache()
+                    y_chunk = y_chunks[j].to(device)
+                    train_mask_chunk = train_mask_chunks[j].to(device)
+                    loss += F.nll_loss(softmax_chunk[train_mask_chunk], y_chunk[train_mask_chunk])
+                    softmax_chunk = softmax_chunk.cpu()
+                    y_chunk = y_chunk.cpu()
+                    train_mask_chunk = train_mask_chunk.cpu() 
+                    if empty_cache: torch.cuda.empty_cache()
+        return loss / num_chunks
 
 
 def train(x, adj, y, train_mask, model, optimizer):
     model.train()
-    total_loss = total_nodes = 0
     optimizer.zero_grad()
-    logits = model(x, adj)
-    loss = F.nll_loss(logits[train_mask], y[train_mask])
+    loss = model(x, adj, y, train_mask)
     loss.backward()
     optimizer.step()
 
-    nodes = train_mask.sum().item()
-    total_loss = loss.item() * nodes
-    total_nodes = nodes
-
-    return total_loss / total_nodes
+    return loss.item()
 
 
 @torch.no_grad()

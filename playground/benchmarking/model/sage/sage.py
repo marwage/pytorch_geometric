@@ -48,7 +48,6 @@ class SAGE(torch.nn.Module):
 
 def train(data, train_mask, model, optimizer):
     model.train()
-    total_loss = total_nodes = 0
     # mw_logging.log_peak_increase("Before zero_grad")
     optimizer.zero_grad()
     # mw_logging.log_peak_increase("After zero_grad")
@@ -68,11 +67,7 @@ def train(data, train_mask, model, optimizer):
     # mw_logging.log_peak_increase("After step")
     # mw_logging.log_timestamp("after step")
 
-    nodes = data.train_mask.sum().item()
-    total_loss = loss.item() * nodes
-    total_nodes = nodes
-
-    return total_loss / total_nodes
+    return loss.item()
 
 
 @torch.no_grad()
@@ -86,7 +81,7 @@ def test(data, model, masks):
     pred = logits.argmax(dim=1)
 
     for i, mask in enumerate(masks):
-        total_correct[i] = (pred[mask] == y[mask]).sum().item()
+        total_correct[i] = (pred[mask] == data.y[mask]).sum().item()
         if mask.dtype == torch.bool:
             total_nodes[i] = mask.sum().item()
         else:
