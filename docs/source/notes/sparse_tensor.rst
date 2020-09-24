@@ -36,8 +36,8 @@ Under the hood, the :class:`~torch_geometric.nn.conv.message_passing.MessagePass
     x = ...           # Node features of shape [num_nodes, num_features]
     edge_index = ...  # Edge indices of shape [2, num_nodes]
 
-    x_j = edge_index[0]  # Source node features [num_edges, num_features]
-    x_i = edge_index[1]  # Target node features [num_edges, num_features]
+    x_j = x[edge_index[0]]  # Source node features [num_edges, num_features]
+    x_i = x[edge_index[1]]  # Target node features [num_edges, num_features]
 
     msg = MLP(x_j - x_i)  # Compute message for each edge
 
@@ -85,7 +85,7 @@ Using the :class:`SparseTensor` class is straightforward and similar to the way 
     adj = adj[:100, :100]  # Slicing, indexing and masking support
     adj = adj.set_diag()   # Add diagonal entries
     adj_t = adj.t()        # Transpose
-    out = adj.matmul(x)x   # Sparse-dense matrix multiplication
+    out = adj.matmul(x)    # Sparse-dense matrix multiplication
     adj = adj.matmul(adj)  # Sparse-sparse matrix multiplication
 
     # Creating SparseTensor instances:

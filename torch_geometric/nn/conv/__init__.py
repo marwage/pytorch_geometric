@@ -29,6 +29,8 @@ from .hypergraph_conv import HypergraphConv
 from .le_conv import LEConv
 from .pna_conv import PNAConv
 from .cluster_gcn_conv import ClusterGCNConv
+from .gen_conv import GENConv
+from .gcn2_conv import GCN2Conv
 
 __all__ = [
     'MessagePassing',
@@ -66,4 +68,6 @@ __all__ = [
     'LEConv',
     'PNAConv',
     'ClusterGCNConv',
+    'GENConv',
+    'GCN2Conv',
 ]

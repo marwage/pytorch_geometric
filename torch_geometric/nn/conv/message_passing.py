@@ -48,8 +48,8 @@ class MessagePassing(torch.nn.Module):
     """
 
     special_args: Set[str] = set([
-        'edge_index', 'adj_t', 'edge_index_i', 'edge_index_j', 'size_i',
-        'size_j', 'ptr', 'index', 'dim_size'
+        'edge_index', 'adj_t', 'edge_index_i', 'edge_index_j', 'size',
+        'size_i', 'size_j', 'ptr', 'index', 'dim_size'
     ])
 
     def __init__(self, aggr: Optional[str] = "add",
@@ -176,6 +176,7 @@ class MessagePassing(torch.nn.Module):
             out['edge_type'] = edge_index.storage.value()
 
         out['index'] = out['edge_index_i']
+        out['size'] = size
         out['size_i'] = size[1] or size[0]
         out['size_j'] = size[0] or size[1]
         out['dim_size'] = out['size_i']
@@ -242,11 +243,11 @@ class MessagePassing(torch.nn.Module):
                 edge_mask = self.__edge_mask__.sigmoid()
                 # Some ops add self-loops to `edge_index`. We need to do the
                 # same for `edge_mask` (but do not train those).
-                if out.size(0) != edge_mask.size(0):
+                if out.size(self.node_dim) != edge_mask.size(0):
                     loop = edge_mask.new_ones(size[0])
                     edge_mask = torch.cat([edge_mask, loop], dim=0)
-                assert out.size(0) == edge_mask.size(0)
-                out = out * edge_mask.view(-1, 1)
+                assert out.size(self.node_dim) == edge_mask.size(0)
+                out = out * edge_mask.view([-1] + [1] * (out.dim() - 1))
 
             aggr_kwargs = self.inspector.distribute('aggregate', coll_dict)
             out = self.aggregate(out, **aggr_kwargs)
