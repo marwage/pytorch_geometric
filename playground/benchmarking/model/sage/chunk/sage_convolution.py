@@ -41,21 +41,41 @@ class SAGE(torch.nn.Module):
 
             # load input for aggregation
             dropout_mat = torch.cat(dropout_chunks)
-            dropout_mat = dropout_mat.to(device)
+            dropout_mat = dropout_mat.to(device)   
+
+            # aggreate neighbourhood features
+            aggr_chunks = []
+            for j, adj_chunk in enumerate(adj_chunks):
+                adj_chunk = adj_chunk.to(device)
+                aggr_chunk = matmul(adj_chunk, dropout_mat, reduce="mean")
+                del adj_chunk
+                aggr_chunk = aggr_chunk.cpu()
+                aggr_chunks.append(aggr_chunk)
+            del dropout_mat
 
             # apply linear and ((ReLU and dropout) or (softmax and loss))
-            for j, adj_chunk in enumerate(adj_chunks):
-                adj_chunk = adj_chunk.to(device) 
-                # graph convolution
-                conv = layer(dropout_mat, adj_chunk) # TODO not possible
-                del adj_chunk
+            for j, (aggr_chunk, dropout_chunk) in enumerate(zip(aggr_chunks, dropout_chunks)):
+                # apply linear
+                aggr_chunk_gpu = aggr_chunk.to(device)
+                dropout_chunk_gpu = dropout_chunk.to(device)
+                linear_neighbours = layer.lin_l(aggr_chunk_gpu)
+                mw_logging.log_current_active("Before delete aggr_chunk_gpu {}-{}".format(i, j))
+                del aggr_chunk_gpu # TODO no decrease
+                mw_logging.log_current_active("After delete aggr_chunk_gpu {}-{}".format(i, j))
+                linear_self = layer.lin_r(dropout_chunk_gpu)
+                mw_logging.log_current_active("Before delete dropout_chunk_gpu {}-{}".format(i, j))
+                del dropout_chunk_gpu # TODO no decrease
+                mw_logging.log_current_active("After delete dropout_chunk_gpu {}-{}".format(i, j))
+                linear = linear_neighbours + linear_self
+                linear_neighbours = linear_neighbours.cpu()
+                linear_self = linear_self.cpu()
 
                 # apply ((ReLU and dropout) or (softmax and loss))
                 if i != (self.num_layers - 1): # (ReLU and dropout)
-                    relu_chunk = F.relu(conv)
-                    mw_logging.log_current_active("Before conv to CPU {}-{}".format(i, j))
-                    conv = conv.cpu() # TODO no decrease
-                    mw_logging.log_current_active("After conv to CPU {}-{}".format(i, j))
+                    relu_chunk = F.relu(linear)
+                    mw_logging.log_current_active("Before linear to CPU {}-{}".format(i, j))
+                    linear = linear.cpu() # TODO no decrease
+                    mw_logging.log_current_active("After linear to CPU {}-{}".format(i, j))
 
                     dropout_chunk = F.dropout(relu_chunk, p=dropout_prob, training=self.training)
                     relu_chunk = relu_chunk.cpu()
@@ -63,10 +83,10 @@ class SAGE(torch.nn.Module):
                     dropout_chunks[j] = dropout_chunk
 
                 else: # softmax and loss
-                    softmax_chunk = F.log_softmax(conv, dim=1)
-                    mw_logging.log_current_active("Before conv to CPU {}-{}".format(i, j))
-                    conv = conv.cpu() # TODO no decrease
-                    mw_logging.log_current_active("After conv to CPU {}-{}".format(i, j))
+                    softmax_chunk = F.log_softmax(linear, dim=1)
+                    mw_logging.log_current_active("Before linear to CPU {}-{}".format(i, j))
+                    linear = linear.cpu() # TODO no decrease
+                    mw_logging.log_current_active("After linear to CPU {}-{}".format(i, j))
                     y_chunk = y_chunks[j].to(device)
                     train_mask_chunk = train_mask_chunks[j].to(device)
                     loss += F.nll_loss(softmax_chunk[train_mask_chunk], y_chunk[train_mask_chunk])

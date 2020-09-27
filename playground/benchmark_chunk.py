@@ -16,7 +16,7 @@ def run(graph_dataset):
     chunk_size = 2 ** 14
     name = "{}_{}_chunk_{}".format("sage", graph_dataset, chunk_size)
     
-    monitoring_gpu = subprocess.Popen(["nvidia-smi", "dmon", "-s", "umt", "-o", "T", "-f", f"{name}.smi"])
+    # monitoring_gpu = subprocess.Popen(["nvidia-smi", "dmon", "-s", "umt", "-o", "T", "-f", f"{name}.smi"])
     logging.basicConfig(filename=f"{name}.log",level=logging.DEBUG)
     mw_logging.set_start()
 
@@ -90,7 +90,7 @@ def run(graph_dataset):
 
     mw_logging.log_gpu_memory("End of training")
 
-    monitoring_gpu.terminate()
+    # monitoring_gpu.terminate()
 
 
 if __name__ == "__main__":
