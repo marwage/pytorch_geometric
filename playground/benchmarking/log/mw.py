@@ -80,5 +80,5 @@ def log_current_active(where:str="?"):
     diff_byte = current_active_byte - last_current_active_byte
     diff = diff_byte / mib
     logging.debug("{}:GPU.active.current {:.2f}MiB, diff {:.2f}MiB".format(where, current_active, diff))
-    logging.debug("{}:GPU.active.current {}B, diff {}B".format(where, current_active_byte, diff_byte))
+    # logging.debug("{}:GPU.active.current {}B, diff {}B".format(where, current_active_byte, diff_byte))
     last_current_active_byte = current_active_byte

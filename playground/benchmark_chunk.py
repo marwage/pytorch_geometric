@@ -7,6 +7,7 @@ import torch_geometric.transforms as T
 from torch_sparse import SparseTensor
 
 from benchmarking.model.sage.chunk import sage
+# from benchmarking.model.sage.chunk import sage_own as sage
 from benchmarking.dataset import reddit, flickr, products
 from benchmarking.log import mw as mw_logging
 
@@ -38,7 +39,7 @@ def run(graph_dataset):
     else:
         raise Exception("Not a valid dataset")
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     num_hidden_channels = 512
     num_hidden_layers = 2
@@ -46,8 +47,6 @@ def run(graph_dataset):
 
     learning_rate = 0.01
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-
-    model = model.to(device)
 
     def backward_hook(module, grad_input, grad_output):
         [mw_logging.log_tensor(t, "grad_input") for t in grad_input]
